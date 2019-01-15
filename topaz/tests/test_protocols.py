@@ -102,7 +102,7 @@ class TestTopaz(pw.tests.BaseTest):
                                           inputCoordinates=inputCoords,
                                           boxSize=100,
                                           scale=4,
-                                          radius=3,
+                                          radius=0,
                                           pi=0.035,
                                           model=1)  # conv31
 

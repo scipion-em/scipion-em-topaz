@@ -101,10 +101,9 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
                                  self.radius.get(),
                                  self.pi.get(),
                                  self.getEnumText('model'))
-        self._insertFunctionStep('createOutputStep',
+        self._insertFunctionStep('extractStep',
                                  self.boxSize.get())
-        self._insertFunctionStep('createOutputStep2',
-                                 np.random.rand())
+        self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions ------------------------------
     def _getInputPath(self, *paths):
@@ -198,13 +197,9 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
 
         self.runTopaz('train %s' % args)
 
-    def createOutputStep(self, boxSize):
+    def extractStep(self, boxSize):
         """ Run the topaz extract command and convert the resulting coordinates,
         taking into account the scaling of the original input micrographs.
-
-        topaz extract -r7 -m saved_models/EMPIAR-10025/model_epoch10.sav \
-              -o saved_models/EMPIAR-10025/predicted_particles_all.txt \
-              data/EMPIAR-10025/processed/micrographs/*.tiff
         """
         prepDir = self._getInputPath('Preprocessed')
         outputDir = self._getExtraPath('saved_models')
@@ -219,7 +214,7 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
 
         self.runTopaz('extract %s' % args)
 
-    def createOutputStep2(self, randAlways):
+    def createOutputStep(self):
         inputMics = self.inputCoordinates.get().getMicrographs()
         outCoordSet = self._createSetOfCoordinates(inputMics)
         outputParticlesFn = self._getExtraPath('saved_models',
@@ -227,8 +222,3 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
         readSetOfCoordinates(outputParticlesFn, inputMics, outCoordSet)
         self._defineOutputs(outputCoordinates=outCoordSet)
 
-
-    # --------------------------- INFO functions ------------------------------
-    def _validate(self):
-        errors = []
-        return errors
