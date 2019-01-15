@@ -1,4 +1,3 @@
-# coding: utf-8
 # **************************************************************************
 # *
 # * Authors:     J.M. De la Rosa Trevin (delarosatrevin@scilifelab.se) [1]
@@ -24,16 +23,15 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-@article{Bepler2018,
-  title={Positive-unlabeled convolutional neural networks for particle picking in cryo-electron micrographs.},
-  author={Bepler, T. and Morin, A. and Brasch, J. and Shapiro, L. and Noble, A.J and Berger, B.},
-  journal={arXiv.},
-  volume={0},
-  number={0},
-  pages={0},
-  year={2018},
-  publisher={arXiv.},
-  doi = {https://arxiv.org/abs/1803.08207}
-}
-"""
+
+import topaz
+
+
+class TopazProtocol:
+    """ Simple class to group some functionality related
+    to all topaz protocols.
+    """
+
+    def runTopaz(self, args):
+        activateCmd = topaz.Plugin.getVar(topaz.constants.TOPAZ_CONDA_ENV)
+        self.runJob('%s; topaz ' % activateCmd, args)

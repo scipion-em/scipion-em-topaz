@@ -1,8 +1,8 @@
 # **************************************************************************
 # *
-# * Authors:     Peter ... (p...@cnb.csic.es)
+# * Authors:     J.M. De la Rosa Trevin (delarosatrevin@scilifelab.se) [1]
 # *
-# * Unidad de  Bioinformatica of Centro Nacional de Biotecnologia , CSIC
+# * [1] SciLifeLab, Stockholm University
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -23,41 +23,31 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-This package contains the protocols and data for crYOLO
-"""
 
-import pyworkflow.em
-from pyworkflow.utils import Environ
-
+import os
+import pyworkflow as pw
 from .constants import TOPAZ_CONDA_ENV
 
 
-class Plugin(pyworkflow.em.Plugin):
+_references = ['Bepler2018']
+
+
+class Plugin(pw.em.Plugin):
     _supportedVersions = []
 
     @classmethod
     def _defineVariables(cls):
-        cls._defineVar(TOPAZ_CONDA_ENV, 'topaz')
+        cls._defineVar(TOPAZ_CONDA_ENV, 'conda activate topaz')
 
     @classmethod
     def getEnviron(cls):
-        """ Setup the environment variables needed to launch sphire. """
-        environ = Environ(os.environ)
-        environ.update({'PATH': str.join(cls.getHome(), 'bin'),
-                        }, position=Environ.BEGIN)
+        """ Setup the environment variables needed to launch topaz. """
+        environ = pw.utils.Environ(os.environ)
         if 'PYTHONPATH' in environ:
             # this is required for python virtual env to work
             del environ['PYTHONPATH']
 
-        # else:
-        #     # TODO: Find a generic way to warn of this situation
-        #     print("%s variable not set on environment." % cls.getHome())
         return environ
 
-    # @classmethod
-    # def isVersionActive(cls):
-    #     return cls.getActiveVersion().startswith(CRYOLO_V1_1_0)
 
-
-pyworkflow.em.Domain.registerPlugin(__name__)
+pw.em.Domain.registerPlugin(__name__)

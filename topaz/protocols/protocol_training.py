@@ -23,333 +23,212 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-import csv, os
+
+import numpy as np
+from itertools import izip
 
 import pyworkflow as pw
+import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as cons
 
+from .protocol_base import TopazProtocol
 
-class TopazProtTraining(pw.em.ProtParticlePicking):
+from topaz.convert import (CsvMicrographList, CsvCoordinateList,
+                           readSetOfCoordinates)
+
+
+class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
     """ Train the Topaz parameters for a picking
     """
     _label = 'training'
 
-    #--------------------------- DEFINE param functions ------------------------
+    # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
+        form.addSection(label='Input')
+
         form.addParam('inputCoordinates', params.PointerParam,
-                      condition='trainDataset',
                       pointerClass='SetOfCoordinates',
                       label='Input coordinates', important=True,
-                      help='Select the SetOfCoordinates to be used for training.')
-        form.addParam('memory', FloatParam, default=2,
-                      label='Memory to use (In Gb)', expertLevel=2)
-        form.addParam('input_size', params.IntParam, default= 1024,
-                      expertLevel=cons.LEVEL_ADVANCED,
-                      label="Input size",
-                      help="crYOLO extracts a patch and rescales to the given"
-                           " input size and uses the resized patch for traning.")
-        form.addParam('bxSzFromCoor', BooleanParam, default=False,
-                      label='Use an input coordinates for box size')
-        form.addParam('boxSize', IntParam, default=100,
-                      condition='bxSzFromCoor==False',
-                      label='Box Size',
-                      help='Box size in pixels. It should be the size of '
-                           'the minimum particle enclosing square in pixel.')
-        form.addParam('coordsToBxSz', PointerParam, pointerClass='SetOfCoordinates',
-                      condition='bxSzFromCoor==True',
-                      label='Coordinates to extract the box size.',
-                      help='Coordinates to extract the box size. '
-                           'It can be an empty set.')
-        form.addParam('batch_size', params.IntParam, default= 3,
-                      expertLevel=cons.LEVEL_ADVANCED,
-                      label="Batch size",
-                      help="Parameter you can set the number of images picked as batch."
-                           " Note this batch size is different from scipion batch size"
-                           " in streaming.")
-        form.addParam('learning_rates', params.FloatParam, default= 1e-4,
-                      expertLevel=cons.LEVEL_ADVANCED,
-                      label="Learning rates",
-                      help="If the number is too small convergence can be slow, if it is "
-                           "too large it can diverge.")
-        form.addParam('max_box_per_image', params.IntParam, default=600,
-                      expertLevel=cons.LEVEL_ADVANCED,
-                      label="Maximum box per image")
+                      help='Select the SetOfCoordinates to be used for '
+                           'training.')
+
+        form.addParam('boxSize', params.IntParam, default=100,
+                      label='Box Size', help='Box size in pixels')
+
+        group = form.addGroup('Pre-processing')
+
+        group.addParam('scale', params.IntParam, default=4,
+                       label='Scale',
+                       help='Factor to down-scale the micrographs for '
+                            'pre-processing')
+
+        group = form.addGroup('Training')
+
+        group.addParam('radius', params.IntParam, default=0,
+                       label='Radius (px)',
+                       help='Radius (in pixels) around particle centers to '
+                            'consider positive. ')
+
+        # FIXME: Check the default of the following parameter
+        group.addParam('pi', params.FloatParam, default=0.035,
+                       label='Pi',
+                       help='Parameter specifying fraction of data that is '
+                            'expected to be positive')
+
+        # FIXME: Check all possible models
+        group.addParam('model', params.EnumParam, default=0,
+                       choices=['resnet8', 'conv31'],
+                       label='Model',
+                       help='Model type to fit.')
+
         form.addHidden(params.GPU_LIST, params.StringParam, default='0',
                          expertLevel=cons.LEVEL_ADVANCED,
                          label="Choose GPU IDs",
                          help="GPU may have several cores. Set it to zero"
-                             " if you do not know what we are talking about."
-                             " First core index is 0, second 1 and so on."
-                             " Motioncor2 can use multiple GPUs - in that case"
-                             " set to i.e. *0 1 2*.")
-        form.addParallelSection(threads=1, mpi=1)
+                              " if you do not know what we are talking about."
+                              " First core index is 0, second 1 and so on."
+                              " Motioncor2 can use multiple GPUs - in that case"
+                              " set to i.e. *0 1 2*.")
 
-        self._defineStreamingParams(form)
+        form.addParallelSection(threads=4, mpi=0)
 
-    #--------------------------- INSERT steps functions ------------------------
-    def _insertInitialSteps(self):
-        # Get pointer to input micrographs
-        self.inputMics = self.inputMicrographs.get()
-
-        steps = [self._insertFunctionStep('createConfigurationFileStep')]
-        if self.trainDataset == True:
-            steps.append(self._insertFunctionStep('convertTrainCoordsStep'))
-            steps.append(self._insertFunctionStep('cryoloModelingStep'))
-
-        return steps
+    # -------------------------- INSERT steps functions -----------------------
+    def _insertAllSteps(self):
+        self._insertFunctionStep('convertInputStep',
+                                 self.inputCoordinates.getObjId(),
+                                 self.scale.get())
+        self._insertFunctionStep('trainingStep',
+                                 self.radius.get(),
+                                 self.pi.get(),
+                                 self.getEnumText('model'))
+        self._insertFunctionStep('createOutputStep',
+                                 self.boxSize.get())
+        self._insertFunctionStep('createOutputStep2',
+                                 np.random.rand())
 
     # --------------------------- STEPS functions ------------------------------
-    def convertTrainCoordsStep(self):
+    def _getInputPath(self, *paths):
+        return self._getExtraPath(*paths)
+
+    def convertInputStep(self, coordsId, scale):
         """ Converts a set of coordinates to box files and binaries to mrc
         if needed. It generates 2 folders 1 for the box files and another for
         the mrc files. To be passed (the folders as params for cryolo
         """
 
         coordSet = self.inputCoordinates.get()
+        coordMics = coordSet.getMicrographs()
 
-        trainMicDir = self._getExtraPath('train_image')
-        pwutils.path.makePath(trainMicDir)
+        # Create input folder for pre-processed micrographs
+        micDir = self._getInputPath('Micrographs')
+        pw.utils.makePath(micDir)
+        prepDir = self._getInputPath('Preprocessed')
+        pw.utils.makePath(prepDir)
 
-        trainCoordDir = self._getExtraPath('train_annotation')
-        pwutils.path.makePath(trainCoordDir)
+        ih = pw.em.ImageHandler()
 
-        def createMic(micId):
-            # we only copy the micrographs once
-            mic = self.inputMics[micId]
-            fileName = mic.getFileName()
-            extensionFn =getExt(fileName)
-            if extensionFn != ".mrc":
-                fileName1 = replaceExt(fileName, "mrc")
-                ih = ImageHandler()   #initalize as an object
-                ih.convert(extensionFn, fileName1)
+        # Create a 0/1 list to mark micrographs for training/testing
+        n = coordMics.getSize()
+        indexes = np.zeros(n, dtype='int8')
+        testN = int(n/10)  # fixme: use percent input var
+        indexes[:testN] = 1
+        np.random.shuffle(indexes)
+        self.info('indexes: %s' % indexes)
 
-            copyFile(mic.getFileName(), trainMicDir)
+        # Write micrographs files
+        csvMics = [
+            CsvMicrographList(self._getInputPath('image_list_train.txt'), 'w'),
+            CsvMicrographList(self._getInputPath('image_list_test.txt'), 'w')
+        ]
 
-        # call the write set of Coordinates passing the createMic function
-        writeSetOfCoordinates(trainCoordDir, coordSet, createMic)
+        micDict = {}
 
-    def createConfigurationFileStep(self):
-        inputSize = self.input_size.get()
-        boxSize = self.getBoxSize()
-        maxBoxPerImage = self.max_box_per_image.get()
+        for i, mic in izip(indexes, coordMics):
+            fn = mic.getFileName()
+            baseFn = pw.utils.removeBaseExt(fn)
+            inputFn = self._getInputPath('Micrographs', '%s.mrc' % baseFn)
+            if fn.endswith('.mrc'):
+                pw.utils.createLink(fn, inputFn)
+            else:
+                ih.convert(mic, inputFn)
 
-        model = {"architecture": "crYOLO",
-                 "input_size": inputSize,
-                 "anchors": [boxSize, boxSize],
-                 "max_box_per_image": maxBoxPerImage,
-                  }
+            prepMicFn = self._getInputPath('Preprocessed', '%s.tiff' % baseFn)
+            csvMics[i].addMic(mic.getObjId(), prepMicFn)
+            micDict[mic.getObjId()] = i  # store if train or test
 
-        if self.trainDataset == False:
-            model.update({"overlap_patches": 200, "num_patches": 3,
-                          "architecture": "YOLO"})
+        for csv in csvMics:
+            csv.close()
 
-        train = { "train_image_folder": "train_image/",
-                  "train_annot_folder": "train_annotation/",
-                  "train_times": 10,
-                  "pretrained_weights": "model.h5",
-                  "batch_size": 3,
-                  "learning_rate": 1e-4,
-                  "nb_epoch": 50,
-                  "warmup_epochs": 0,
-                  "object_scale": 5.0,
-                  "no_object_scale": 1.0,
-                  "coord_scale": 1.0,
-                  "class_scale": 1.0,
-                  "log_path": "logs/",
-                  "saved_weights_name": "model.h5",
-                  "debug": True
-                           }
+        # Write particles files
+        csvParts = [
+            CsvCoordinateList(self._getInputPath('particles_train.txt'), 'w'),
+            CsvCoordinateList(self._getInputPath('particles_test.txt'), 'w')
+        ]
 
-        valid = {"valid_image_folder": "",
-                 "valid_annot_folder": "",
-                 "valid_times": 1
-                 }
+        for coord in coordSet:
+            micId = coord.getMicId()
+            x = coord.getX() / scale
+            y = coord.getY() / scale
+            csvParts[micDict[micId]].addCoord(micId, x, y)
 
+        for csv in csvParts:
+            csv.close()
 
-        jsonDict = {"model" : model}
+        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/'
+                      % (scale, micDir, prepDir))
 
-        if self.trainDataset == True:
-            jsonDict.update({"train" : train, "valid" : valid})
+    def trainingStep(self, radius, pi, model):
+        """ Train the model with the provided parameters and the previously
+        preprocessed micrograph images and the provided input coordinates.
+        """
+        outputDir = self._getExtraPath('saved_models')
+        pw.utils.makePath(outputDir)
 
-        with open(self._getExtraPath('config.json'), 'w') as fp:
-            json.dump(jsonDict, fp, indent=4)
+        args = ' --radius %d' % radius
+        args += ' --pi %f' % pi
+        args += ' --model %s' % model
+        args += ' --train-images %s' % self._getInputPath('image_list_train.txt')
+        args += ' --train-targets %s' % self._getInputPath('particles_train.txt')
+        args += ' --test-images %s' % self._getInputPath('image_list_test.txt')
+        args += ' --test-targets %s' % self._getInputPath('particles_test.txt')
+        args += ' --num-workers=%d' % self.numberOfThreads
+        args += ' --device %s' % self.gpuList
+        args += ' --save-prefix=%s/model' % outputDir
+        args += ' -o %s/model_training.txt' % outputDir
 
-    def cryoloModelingStep(self):
+        self.runTopaz('train %s' % args)
 
-        wParam = 3  # define this in the form ???
-        gParam = (' '.join(str(g) for g in self.getGpuList()))
-        eParam = 0  # define this in the form ???
-        params = "-c config.json"
-        params += " -w %s -g %s" % (wParam, gParam)
-        if eParam != 0:
-            params += " -e %s" % eParam
+    def createOutputStep(self, boxSize):
+        """ Run the topaz extract command and convert the resulting coordinates,
+        taking into account the scaling of the original input micrographs.
 
-        program = 'cryolo_train.py'
-        label = 'train'
-        self._preparingCondaProgram(program, params, label)
-        shellName = os.environ.get('SHELL')
-        self.info("**Running:** %s %s" % (program, params))
-        self.runJob('%s ./script_%s.sh' % (shellName, label), '', cwd=self._getExtraPath(),
-                    env=Plugin.getEnviron())
+        topaz extract -r7 -m saved_models/EMPIAR-10025/model_epoch10.sav \
+              -o saved_models/EMPIAR-10025/predicted_particles_all.txt \
+              data/EMPIAR-10025/processed/micrographs/*.tiff
+        """
+        prepDir = self._getInputPath('Preprocessed')
+        outputDir = self._getExtraPath('saved_models')
 
+        # TODO: Maybe allow as parameter? It should be clear for the user if relative
+        # to input micrographs or to the downscaled ones
+        extractRadius = (boxSize / 4) / self.scale.get()
+        args = '-r%d' % extractRadius
+        args += ' -m %s/model_epoch10.sav' % outputDir  #TODO: Check this if more than 10 epochs
+        args += ' -o %s/predicted_particles_all.txt' % outputDir
+        args += ' %s/*.tiff' % prepDir
 
+        self.runTopaz('extract %s' % args)
 
-    def _pickMicrograph(self, micrograph, *args):
-        "This function picks from a given micrograph"
-        self._pickMicrographList([micrograph], args)
-
-
-    def _pickMicrographList(self, micList, *args):
-        #clear the extra folder
-        #pwutils.path.cleanPath(self._getExtraPath())
-
-        MIC_FOLDER = 'mics'   #refactor--->extract--->constant, more robust
-        mics = self._getTmpPath()
-
-        # Create folder with linked mics
-        for micrograph in micList:
-            source = os.path.abspath(micrograph.getFileName())
-            basename = os.path.basename(source)
-            dest = os.path.abspath(os.path.join(mics, basename))
-            pwutils.path.createLink(source, dest)
+    def createOutputStep2(self, randAlways):
+        inputMics = self.inputCoordinates.get().getMicrographs()
+        outCoordSet = self._createSetOfCoordinates(inputMics)
+        outputParticlesFn = self._getExtraPath('saved_models',
+                                               'predicted_particles_all.txt')
+        readSetOfCoordinates(outputParticlesFn, inputMics, outCoordSet)
+        self._defineOutputs(outputCoordinates=outCoordSet)
 
 
-        if self.trainDataset == True:
-            wParam = os.path.abspath(self._getExtraPath('model.h5'))
-        else:
-            wParam = Plugin.getVar(CRYOLO_MODEL_VAR)
-        gParam = (' '.join(str(g) for g in self.getGpuList()))
-        eParam = 0  # define this in the form ???
-        tParam = 0.2 # define this in the form ???
-        params = "-c %s " % self._getExtraPath('config.json')
-        params += " -w %s -g %s" % (wParam, gParam)
-        params += " -i %s/" % mics
-        params += " -o %s/" % mics
-        params += " -t %s" % tParam
-
-        program2 = 'cryolo_predict.py'
-        label = 'predict'
-        self._preparingCondaProgram(program2, params, label)
-        shellName = os.environ.get('SHELL')
-        self.info("**Running:** %s %s" % (program2, params))
-        self.runJob('%s %s/script_%s.sh' % (shellName, self._getExtraPath(), label), '',
-                    env=Plugin.getEnviron())
-
-    def readCoordsFromMics(self, outputDir, micDoneList , outputCoords):
-        "This method read coordinates from a given list of micrographs"
-
-        # Evaluate if micDonelist is empty
-        if len(micDoneList) == 0:
-            return
-
-        # Create a map micname --> micId
-        micMap = {}
-        for mic in micDoneList:
-            key = removeBaseExt(mic.getFileName())
-            micMap[key] = (mic.getObjId(), mic.getFileName())
-
-        outputCoords.setBoxSize(self.getBoxSize())
-        # Read output file (4 column tabular file)
-        outputCRYOLOCoords = self._getTmpPath()
-
-        # Calculate if flip is needed
-        flip, y = getFlippingParams(mic.getFileName())
-
-        # For each box file
-        for boxFile in os.listdir(outputCRYOLOCoords):
-            if '.box' in boxFile:
-                # Add coordinates file
-                self._coordinatesFileToScipion(outputCoords, os.path.join(outputCRYOLOCoords,boxFile), micMap, flipOnY=flip, imgHeight=y)
-
-        # Move mics and box files
-        pwutils.path.moveTree(self._getTmpPath(), self._getExtraPath())
-        pwutils.path.makePath(self._getTmpPath())
-
-    def _coordinatesFileToScipion(self, coordSet, coordFile, micMap, flipOnY=False, imgHeight=None ):
-
-        with open(coordFile, 'r') as f:
-            # Configure csv reader
-            reader = csv.reader(f, delimiter='\t')
-
-            #(width, height, foo) = self.inputMicrographs.get().getDim()
-
-            for x,y,xBox,ybox in reader:
-
-                # Create a scipion coordinate item
-                offset = int(self.getBoxSize()/2)
-
-                # USE the flip and imageHeight!! To flip or not to flip!
-                sciX = int(float(x)) + offset
-                sciY = int(float(y)) + offset
-
-                if flipOnY == True:
-                    sciY = imgHeight - sciY
-                # else:
-                #     sciY = int(float(y)) - offset
-
-                coordinate = Coordinate(x=sciX, y=sciY)
-                micBaseName = removeBaseExt(coordFile)
-                micId, micName = micMap[micBaseName]
-                coordinate.setMicId(micId)
-                coordinate.setMicName(micName)
-                # Add it to the set
-                coordSet.append(coordinate)
-
-    def createOutputStep(self):
-        pass
-
-    #--------------------------- INFO functions --------------------------------
-    def _citations(self):
-        return ['Wagner2018']
-
-    def _warnings(self):
-        warningMsgs = []
-
-        if self.trainDataset == True:
-            if self.inputCoordinates.get().getSize() < 13000:
-                warningMsgs.append("The input SetOfCoordinates must be larger "
-                                   "than 13000 items.")
-
-        return warningMsgs
-
+    # --------------------------- INFO functions ------------------------------
     def _validate(self):
         errors = []
-        if self.trainDataset == False:
-            if Plugin.getVar(CRYOLO_MODEL_VAR) == '':
-                errors.append("If _Train dataset?_ is set to _NO_\n" 
-                              "The general model for cryolo must be "
-                              "download from Sphire/crYOLO website and "
-                              "~/.config/scipion/scipion.conf must contain "
-                              "the 'CRYOLO_MODEL' parameter pointing to "
-                              "the downloaded file.")
-            elif not os.path.isfile(Plugin.getVar(CRYOLO_MODEL_VAR)):
-                errors.append("General model not found at '%s' and "
-                              "needed in the non-training mode. "
-                              "Please check the path or "
-                              "the ~/.config/scipion/scipion.conf.\n"
-                              "You can download the file from "
-                              "the Sphire/crYOLO website."
-                              % Plugin.getVar(CRYOLO_MODEL_VAR))
-            if errors:
-                errors.append("Even though, you can still using crYOLO "
-                              "training first the network by setting "
-                              "_Train dataset?_ to *YES* and providing "
-                              "some already picked coordinates.")
         return errors
-
-    #--------------------------- UTILS functions -------------------------------
-    def _preparingCondaProgram(self, program, params='', label=''):
-        with open(self._getExtraPath('script_%s.sh' % label), "w") as f:
-            # lines = 'pwd\n'
-            # lines += 'ls\n'
-            lines = 'source activate %s\n' % Plugin.getVar(CRYOLO_ENV_NAME)
-            lines += 'export CUDA_VISIBLE_DEVICES=%s\n' % (' '.join(str(g) for g in self.getGpuList()))
-            lines += '%s %s\n' % (program, params)
-            lines += 'source deactivate\n'
-            f.write(lines)
-
-    def getBoxSize(self):
-        if self.bxSzFromCoor:
-            return self.coordsToBxSz.get().getBoxSize()
-        else:
-            return self.boxSize.get()

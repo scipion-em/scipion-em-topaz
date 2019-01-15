@@ -26,8 +26,10 @@
 import pyworkflow as pw
 import pyworkflow.protocol.constants as cons
 
+from .protocol_base import TopazProtocol
 
-class TopazProtPicking(pw.em.ProtParticlePickingAuto):
+
+class TopazProtPicking(pw.em.ProtParticlePickingAuto, TopazProtocol):
     """ Picks particles in a set of micrographs
     either manually or in a supervised mode.
     """
