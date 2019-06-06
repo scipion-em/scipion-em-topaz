@@ -25,7 +25,7 @@
 # **************************************************************************
 
 import csv
-
+import pyworkflow.utils as pwutils
 import pyworkflow as pw
 
 
@@ -78,7 +78,7 @@ class CsvCoordinateList(CsvImageList):
         self._addRow('%06d' % micId, x, y)
 
 
-def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet):
+def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet, scale):
     """ Read coordinates produced by Topaz.
     Coordinates are expected in a single csv file, with the following columns:
      first: image_name (mic id)
@@ -92,53 +92,27 @@ def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet):
     coord = pw.em.Coordinate()
     coord._topazScore = pw.object.Float()
 
+    micDict = {}
+    # loop to generate a dictionary --> micBaseName : Micrograph
+    for mic in micSet:
+        micBaseName = pwutils.removeBaseExt(mic.getFileName())
+        micNew = mic.clone()
+        micDict[micBaseName] = micNew
+
     for row in csv:
-        micId = int(row[0])
-        if micId != lastMicId:
-            print("New mic: ", micId)
-            mic = micSet[micId]
+        micBaseName = (row[0])
+        if micBaseName != lastMicId:
+            print("New mic: ", micBaseName)
+            mic = micDict[micBaseName]
             if mic is None:
-                print("Missing id: ", micId)
+                print("Missing id: ", micBaseName)
             else:
                 coord.setMicrograph(mic)
-                lastMicId = micId
+                lastMicId = micBaseName
 
-        coord.setPosition(int(row[1]), int(row[2]))
+        coord.setPosition(int(round(float(row[1])*scale)), int(round(float(row[2])*scale)))
         coord._topazScore.set(float(row[3]))
         coord.setObjId(None)
         coordSet.append(coord)
 
     return
-    # Read the boxSize from the config.xmd metadata
-    configfile = join(outputDir, 'config.xmd')
-    if exists(configfile):
-        md = xmippLib.MetaData('properties@' + join(outputDir, 'config.xmd'))
-        boxSize = md.getValue(xmippLib.MDL_PICKING_PARTICLE_SIZE,
-                              md.firstObject())
-        coordSet.setBoxSize(boxSize)
-    for mic in micSet:
-        posFile = join(outputDir, replaceBaseExt(mic.getFileName(), 'pos'))
-        readCoordinates(mic, posFile, coordSet, outputDir, readDiscarded)
-
-    coordSet._xmippMd = String(outputDir)
-
-
-def readCoordinates(mic, fileName, coordsSet, outputDir, readDiscarded=False):
-        posMd = readPosCoordinates(fileName, readDiscarded)
-        # TODO: CHECK IF THIS LABEL IS STILL NECESSARY
-        posMd.addLabel(md.MDL_ITEM_ID)
-
-        for objId in posMd:
-            # When do an union of two metadatas of coordinates and one of
-            # them doesn't has MDL_ENABLED, the default vaule to is 0,
-            # and its not allowed value. Maybe we need to solve this in xmipp
-            # code.
-            if posMd.getValue(md.MDL_ENABLED, objId) == 0:
-                posMd.setValue(md.MDL_ENABLED, 1, objId)
-
-            coord = rowToCoordinate(rowFromMd(posMd, objId))
-            coord.setMicrograph(mic)
-            coord.setX(coord.getX())
-            coord.setY(coord.getY())
-            coordsSet.append(coord)
-            posMd.setValue(md.MDL_ITEM_ID, long(coord.getObjId()), objId)

@@ -24,8 +24,7 @@
 # *
 # **************************************************************************
 
-import re
-import os
+
 
 import pyworkflow as pw
 from topaz.protocols import TopazProtTraining

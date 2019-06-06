@@ -27,6 +27,7 @@
 import os
 import pyworkflow as pw
 from .constants import TOPAZ_CONDA_ENV
+import topaz
 
 
 _references = ['Bepler2018']
@@ -38,6 +39,13 @@ class Plugin(pw.em.Plugin):
     @classmethod
     def _defineVariables(cls):
         cls._defineVar(TOPAZ_CONDA_ENV, 'conda activate topaz')
+
+    @classmethod
+    def getTopazEnvActivation(cls):
+        activation = cls.getVar(TOPAZ_CONDA_ENV)
+        scipionHome = pw.Config.SCIPION_HOME + os.path.sep
+
+        return activation.replace(scipionHome, "", 1)
 
     @classmethod
     def getEnviron(cls):

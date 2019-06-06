@@ -62,6 +62,12 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
                        help='Factor to down-scale the micrographs for '
                             'pre-processing')
 
+        group.addParam('splitData', params.IntParam, default=10,
+                      label='Split data',
+                      help='Data is split into train and test sets. '
+                           'E.g.:10 means 10% of the input micrographs and associated labeled '
+                           'particles will go into the test set, 90% will go into the train set.')
+
         group = form.addGroup('Training')
 
         group.addParam('radius', params.IntParam, default=0,
@@ -69,15 +75,17 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
                        help='Radius (in pixels) around particle centers to '
                             'consider positive. ')
 
-        # FIXME: Check the default of the following parameter
+        group.addParam('numEpochs', params.IntParam, default=10,
+                       label='Number of epochs',
+                       help='Maximum number of training epochs')
+
         group.addParam('pi', params.FloatParam, default=0.035,
                        label='Pi',
                        help='Parameter specifying fraction of data that is '
-                            'expected to be positive')
+                            'expected to be positive. Pi<0.05')
 
-        # FIXME: Check all possible models
         group.addParam('model', params.EnumParam, default=0,
-                       choices=['resnet8', 'conv31'],
+                       choices=['resnet8', 'conv31', 'conv63', 'conv127'],
                        label='Model',
                        help='Model type to fit.')
 
@@ -96,23 +104,26 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
     def _insertAllSteps(self):
         self._insertFunctionStep('convertInputStep',
                                  self.inputCoordinates.getObjId(),
-                                 self.scale.get())
+                                 self.scale.get(),
+                                 self.splitData.get())
         self._insertFunctionStep('trainingStep',
                                  self.radius.get(),
+                                 self.numEpochs.get(),
                                  self.pi.get(),
                                  self.getEnumText('model'))
-        self._insertFunctionStep('extractStep',
-                                 self.boxSize.get())
+        self._insertFunctionStep('predictStep',
+                                 self.boxSize.get(),
+                                 self.numEpochs.get())
         self._insertFunctionStep('createOutputStep')
 
     # --------------------------- STEPS functions ------------------------------
     def _getInputPath(self, *paths):
         return self._getExtraPath(*paths)
 
-    def convertInputStep(self, coordsId, scale):
+    def convertInputStep(self, inputCoordinates, scale, splitData):
         """ Converts a set of coordinates to box files and binaries to mrc
         if needed. It generates 2 folders 1 for the box files and another for
-        the mrc files. To be passed (the folders as params for cryolo
+        the mrc files. To be passed (the folders as params for cryolo)
         """
 
         coordSet = self.inputCoordinates.get()
@@ -129,8 +140,8 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
         # Create a 0/1 list to mark micrographs for training/testing
         n = coordMics.getSize()
         indexes = np.zeros(n, dtype='int8')
-        testN = int(n/10)  # fixme: use percent input var
-        indexes[:testN] = 1
+        testSetImages = int((float(splitData) / 100) * n)
+        indexes[:testSetImages] = 1
         np.random.shuffle(indexes)
         self.info('indexes: %s' % indexes)
 
@@ -151,7 +162,7 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
             else:
                 ih.convert(mic, inputFn)
 
-            prepMicFn = self._getInputPath('Preprocessed', '%s.tiff' % baseFn)
+            prepMicFn = self._getInputPath('Preprocessed', '%s.mrc' % baseFn)
             csvMics[i].addMic(mic.getObjId(), prepMicFn)
             micDict[mic.getObjId()] = i  # store if train or test
 
@@ -166,8 +177,8 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
 
         for coord in coordSet:
             micId = coord.getMicId()
-            x = coord.getX() / scale
-            y = coord.getY() / scale
+            x = int(round(float(coord.getX()) / scale))
+            y = int(round(float(coord.getY()) / scale))
             csvParts[micDict[micId]].addCoord(micId, x, y)
 
         for csv in csvParts:
@@ -176,7 +187,7 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
         self.runTopaz('preprocess -s%d %s/*.mrc -o %s/'
                       % (scale, micDir, prepDir))
 
-    def trainingStep(self, radius, pi, model):
+    def trainingStep(self, radius, numEpochs, pi, model):
         """ Train the model with the provided parameters and the previously
         preprocessed micrograph images and the provided input coordinates.
         """
@@ -192,12 +203,13 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
         args += ' --test-targets %s' % self._getInputPath('particles_test.txt')
         args += ' --num-workers=%d' % self.numberOfThreads
         args += ' --device %s' % self.gpuList
+        args += ' --num-epochs %d' % numEpochs
         args += ' --save-prefix=%s/model' % outputDir
         args += ' -o %s/model_training.txt' % outputDir
 
         self.runTopaz('train %s' % args)
 
-    def extractStep(self, boxSize):
+    def predictStep(self, boxSize, numEpochs):
         """ Run the topaz extract command and convert the resulting coordinates,
         taking into account the scaling of the original input micrographs.
         """
@@ -206,19 +218,39 @@ class TopazProtTraining(pw.em.ProtParticlePicking, TopazProtocol):
 
         # TODO: Maybe allow as parameter? It should be clear for the user if relative
         # to input micrographs or to the downscaled ones
-        extractRadius = (boxSize / 4) / self.scale.get()
+        extractRadius = (boxSize / 2) / self.scale.get()
         args = '-r%d' % extractRadius
-        args += ' -m %s/model_epoch10.sav' % outputDir  #TODO: Check this if more than 10 epochs
+        args += ' -m %s/model_epoch%d.sav' % (outputDir, numEpochs)
         args += ' -o %s/predicted_particles_all.txt' % outputDir
-        args += ' %s/*.tiff' % prepDir
+        args += ' %s/*.mrc' % prepDir
 
         self.runTopaz('extract %s' % args)
 
     def createOutputStep(self):
         inputMics = self.inputCoordinates.get().getMicrographs()
         outCoordSet = self._createSetOfCoordinates(inputMics)
+        outCoordSet.copyInfo(self.inputCoordinates.get())
         outputParticlesFn = self._getExtraPath('saved_models',
                                                'predicted_particles_all.txt')
-        readSetOfCoordinates(outputParticlesFn, inputMics, outCoordSet)
+        readSetOfCoordinates(outputParticlesFn, inputMics, outCoordSet, self.scale.get())
         self._defineOutputs(outputCoordinates=outCoordSet)
+
+
+    # --------------------------- INFO functions -------------------------------
+    def _validate(self):
+        validateMsgs = []
+
+        coordSet = self.inputCoordinates.get()
+        coordMics = coordSet.getMicrographs()
+        n = coordMics.getSize()
+
+        testSetImages = int((float(self.splitData.get()) / 100) * n)
+        if testSetImages == 0:
+            requiredMinPercentage = ((1 * 100) / n) + 1
+            validateMsgs.append("Please set splitData to minimum: %d" % requiredMinPercentage)
+        elif testSetImages == n:
+            validateMsgs.append("Please set splitData to maximum: 99")
+
+        return validateMsgs
+
 
