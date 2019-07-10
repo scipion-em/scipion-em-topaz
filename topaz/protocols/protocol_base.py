@@ -32,7 +32,7 @@ class TopazProtocol:
     to all topaz protocols.
     """
 
-
     def runTopaz(self, args):
         activateCmd = topaz.Plugin.getTopazEnvActivation()
-        self.runJob('%s; topaz' %activateCmd, args)
+        self.runJob('%s; topaz ' %activateCmd, args)
+

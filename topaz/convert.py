@@ -25,8 +25,12 @@
 # **************************************************************************
 
 import csv
+import os
+
 import pyworkflow.utils as pwutils
 import pyworkflow as pw
+
+from topaz import constants
 
 
 class CsvImageList:
@@ -78,6 +82,30 @@ class CsvCoordinateList(CsvImageList):
         self._addRow('%06d' % micId, x, y)
 
 
+def convertMicrographs(micList, micDir):
+    """ Convert (or simply link) input micrographs into the given directory
+    in a format that is compatible with Topaz.
+    """
+    ih = pw.em.ImageHandler()
+    ext = pwutils.getExt(micList[0].getFileName())
+
+    def _convert(mic, newName):
+        ih.convert(mic, os.path.join(micDir, newName))
+
+    def _link(mic, newName):
+        pwutils.createAbsLink(os.path.abspath(mic.getFileName()),
+                              os.path.join(micDir, newName))
+
+    if ext in constants.TOPAZ_SUPPORTED_FORMATS:
+        func = _link
+    else:
+        func = _convert
+        ext = '.mrc'
+
+    for mic in micList:
+        func(mic, getMicIdName(mic, suffix=ext))
+
+
 def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet, scale):
     """ Read coordinates produced by Topaz.
     Coordinates are expected in a single csv file, with the following columns:
@@ -95,24 +123,27 @@ def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet, scale):
     micDict = {}
     # loop to generate a dictionary --> micBaseName : Micrograph
     for mic in micSet:
-        micBaseName = pwutils.removeBaseExt(mic.getFileName())
         micNew = mic.clone()
-        micDict[micBaseName] = micNew
+        micDict[mic.getObjId()] = micNew
 
+    #loop the Topaz outputfile
     for row in csv:
-        micBaseName = (row[0])
-        if micBaseName != lastMicId:
-            print("New mic: ", micBaseName)
-            mic = micDict[micBaseName]
+        micId = int(row[0])
+        if micId != lastMicId:
+            mic = micDict[micId]
             if mic is None:
-                print("Missing id: ", micBaseName)
+                print("Missing id: ", micId)
             else:
                 coord.setMicrograph(mic)
-                lastMicId = micBaseName
+                lastMicId = micId
 
         coord.setPosition(int(round(float(row[1])*scale)), int(round(float(row[2])*scale)))
         coord._topazScore.set(float(row[3]))
         coord.setObjId(None)
         coordSet.append(coord)
 
-    return
+    csv.close()
+
+def getMicIdName(mic, suffix=''):
+    """ Return a name for the micrograph based on its IDs. """
+    return '%d%s' % (mic.getObjId(), suffix)
