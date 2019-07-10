@@ -185,7 +185,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         the mrc files. To be passed (the folders as params for cryolo)
         """
 
-        micIds2 = []
+        micIds = []
         coordSet = self.inputCoordinates.get()
         setFn = coordSet.getFileName()
         self.debug("Loading input db: %s" % setFn)
@@ -197,15 +197,15 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
             coordSet.loadAllProperties()
 
             for micAgg in coordSet.aggregate(["MAX"], "_micId", ["_micId"]):
-                micIds2.append(micAgg["_micId"])
-                if len(micIds2) == self.micsForTraining.get():
+                micIds.append(micAgg["_micId"])
+                if len(micIds) == self.micsForTraining.get():
                     break
             if micAgg["_micId"] == self.micsForTraining.get():
                 break
             else:
                 if coordSet.isStreamClosed():
                     raise Exception("We have a problem!!")
-                self.info("Not yet there: %s" % len(micIds2))
+                self.info("Not yet there: %s" % len(micIds))
                 import time
                 time.sleep(10)
 
@@ -223,7 +223,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         coordMics.loadAllProperties()
 
         # Create a 0/1 list to mark micrographs for training/testing
-        n = len(micIds2)
+        n = len(micIds)
         indexes = np.zeros(n, dtype='int8')
         testSetImages = int((splitData / float(100)) * n)
 
@@ -245,7 +245,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
 
         # Store the micId and indexes in micDict
         micDict = {}
-        for i, micId in izip(indexes, micIds2):
+        for i, micId in izip(indexes, micIds):
             mic = coordMics[micId]
             micFn = mic.getFileName()
             baseFn = pw.utils.removeBaseExt(micFn)
@@ -269,7 +269,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
             CsvCoordinateList(self._getFileName(PARTICLES_TEST_TXT), 'w')
         ]
 
-        for micId in micIds2:
+        for micId in micIds:
             # Loop through the subset of coordinates that was picked by the previous step
             for coord in coordSet.iterItems(orderBy='_micId'):
                 x = int(round(float(coord.getX()) / scale))
