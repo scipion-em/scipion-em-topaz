@@ -55,7 +55,7 @@ class Plugin(pw.em.Plugin):
     @classmethod
     def getTopazEnvActivation(cls):
         """ Remove the scipion home and activate the conda topaz environment. """
-        topazActivationCmd = os.environ.get('TOPAZ_ACTIVATION_CMD')
+        topazActivationCmd = cls.getVar(TOPAZ_ACTIVATION_CMD)
         correctCommand = topazActivationCmd.replace(pw.Config.SCIPION_HOME + "/", "")
 
         return cls.getCondaActivationCmd() + " " + correctCommand
@@ -80,8 +80,8 @@ class Plugin(pw.em.Plugin):
         if not condaActivationCmd:
             neededProgs = ['conda']
 
-        installationCmd = '%s conda create -y -n %s python==2.7; conda install -y topaz cudatoolkit=9.2 -c tbepler -c pytorch; touch %s' % \
-                           (condaActivationCmd, DEFAULT_ENV_NAME, TOPAZ_INSTALLED)
+        installationCmd = '%s conda create -y -n %s;conda activate %s; conda install -y topaz cudatoolkit=9.2 -c tbepler -c pytorch; touch %s' % \
+                           (condaActivationCmd, DEFAULT_ENV_NAME, DEFAULT_ENV_NAME, TOPAZ_INSTALLED)
         topaz_commands = [(installationCmd, TOPAZ_INSTALLED)]
 
         envPath = os.environ.get('PATH', "")  # keep path since conda likely in there

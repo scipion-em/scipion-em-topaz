@@ -104,11 +104,13 @@ class TestTopaz(pw.tests.BaseTest):
                                           micsForTraining=10,
                                           inputCoordinates=inputCoords,
                                           splitData=50,
-                                          boxSize=100,
+                                          boxSize=65,
                                           scale=4,
                                           radius=0,
                                           pi=0.035,
-                                          model=1)  # conv31
+                                          model=1,  # conv31
+                                          numEpochs=2,
+                                          streamingBatchSize=4)
 
         self.launchProtocol(protTopazTrain)
 
