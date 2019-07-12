@@ -33,5 +33,6 @@ class TopazProtocol:
     """
 
     def runTopaz(self, args):
-        activateCmd = topaz.Plugin.getVar(topaz.constants.TOPAZ_CONDA_ENV)
-        self.runJob('%s; topaz ' % activateCmd, args)
+        activateCmd = topaz.Plugin.getTopazEnvActivation()
+        self.runJob('%s; topaz ' %activateCmd, args)
+

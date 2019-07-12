@@ -25,4 +25,3 @@
 # **************************************************************************
 
 from .protocol_training import TopazProtTraining
-from .protocol_picking import TopazProtPicking
