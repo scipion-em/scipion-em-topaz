@@ -24,10 +24,10 @@
 # *
 # **************************************************************************
 
-import re
-import os
+
 
 import pyworkflow as pw
+import pyworkflow.em
 from topaz.protocols import TopazProtTraining
 
 
@@ -69,6 +69,7 @@ class TestTopaz(pw.tests.BaseTest):
         print "Preprocessing the micrographs..."
         protPreprocess = self.newProtocol(XmippProtPreprocessMicrographs,
                                           doCrop=True, cropPixels=25)
+        self.protPreprocess = protPreprocess
         protPreprocess.inputMicrographs.set(inputMics)
         protPreprocess.setObjLabel('crop 50px')
         self.launchProtocol(protPreprocess)
@@ -99,12 +100,17 @@ class TestTopaz(pw.tests.BaseTest):
         inputCoords = protImportCoords.outputCoordinates
         protTopazTrain = self.newProtocol(TopazProtTraining,
                                           objLabel='topaz - training',
+                                          inputMicrographs=self.protPreprocess.outputMicrographs,
+                                          micsForTraining=10,
                                           inputCoordinates=inputCoords,
-                                          boxSize=100,
+                                          splitData=50,
+                                          boxSize=65,
                                           scale=4,
                                           radius=0,
                                           pi=0.035,
-                                          model=1)  # conv31
+                                          model=1,  # conv31
+                                          numEpochs=2,
+                                          streamingBatchSize=4)
 
         self.launchProtocol(protTopazTrain)
 
