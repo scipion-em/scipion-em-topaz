@@ -21,7 +21,7 @@ https://github.com/I2PC/scipion/wiki/How-to-Install-Scipion-from-sources#from-gi
 
 Topaz integration
 -----------------
-The following steps presuppose that you have Anaconda or Miniconda installed on your computer.  
+|The following steps presuppose that you have Anaconda or Miniconda installed on your computer.  
 | STEP1:
 | In ~/.config/scipion/scipion.conf: Set CONDA_ACTIVATION_CMD variable
   in the Packages section. For example: CONDA_ACTIVATION_CMD = .
