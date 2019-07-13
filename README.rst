@@ -25,7 +25,7 @@ Topaz integration
 | STEP1:
 | In ~/.config/scipion/scipion.conf: 
 | Set CONDA_ACTIVATION_CMD variable in the Packages section.
-| For example: CONDA_ACTIVATION_CMD = . ~/anaconda2/etc/profile.d/conda.sh . 
+| For example: CONDA_ACTIVATION_CMD = . ~/anaconda2/etc/profile.d/conda.sh 
 | Notice the command starts with a period! This will source the conda.sh script.
   This is needed to activate the conda environment.
 | For further information please visit the following website:
