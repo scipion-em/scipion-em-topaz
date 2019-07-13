@@ -32,7 +32,7 @@ Topaz integration
 | https://github.com/conda/conda/blob/master/CHANGELOG.md#440-2017-12-20
 | Set TOPAZ_ACTIVATION_CMD variable in the Packages section. 
 | For example: TOPAZ_ACTIVATION_CMD = conda activate topaz 
-|This will activate the conda environment with the default name topaz.
+| This will activate the conda environment with the default name topaz.
 
 | STEP2:
 | Type ./scipion installp -p topaz or you can also install it from the
