@@ -23,10 +23,10 @@ Topaz integration
 -----------------
 | The following steps presuppose that you have Anaconda or Miniconda installed on your computer.  
 | STEP1:
-| In ~/.config/scipion/scipion.conf: Set CONDA_ACTIVATION_CMD variable
-  in the Packages section. For example: CONDA_ACTIVATION_CMD = .
-  ~/anaconda2/etc/profile.d/conda.sh . Notice the command starts with a period. 
-  This will source the conda.sh script.
+| In ~/.config/scipion/scipion.conf: 
+| Set CONDA_ACTIVATION_CMD variable in the Packages section.
+| For example: CONDA_ACTIVATION_CMD = . ~/anaconda2/etc/profile.d/conda.sh . 
+| Notice the command starts with a period. This will source the conda.sh script.
   This is needed to activate the conda environment.
   For further information please visit the following website:
   https://github.com/conda/conda/blob/master/CHANGELOG.md#440-2017-12-20
