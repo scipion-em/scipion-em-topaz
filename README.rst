@@ -24,14 +24,15 @@ For developers
    For that, just install Scipion from `GitHub`_, using the ‘devel’ branch. 
 2. Follow the 'Topaz integration' instructions below.
 3. Clone this repository in you system: 
-::
+   ::
 
-   cd
-   git clone https://github.com/scipion-em/scipion-em-topaz
+      cd
+      git clone https://github.com/scipion-em/scipion-em-topaz
    
 4. Install the Topaz plugin in devel mode:
-::
-   scipion installp -p ~/scipion-em-topaz --devel
+   ::
+      
+      scipion installp -p ~/scipion-em-topaz --devel
 
 
 Topaz integration
