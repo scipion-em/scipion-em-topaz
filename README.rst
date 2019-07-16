@@ -23,9 +23,15 @@ For developers
 1. For testing and develop this plugin, you need to use the Scipion v2.0 in devel. 
    For that, just install Scipion from `GitHub`_, using the ‘devel’ branch. 
 2. Follow the 'Topaz integration' instructions below.
-3. Clone this repository in you system: `cd ; git clone https://github.com/scipion-em/scipion-em-topaz`
+3. Clone this repository in you system: 
+::
+
+   cd
+   git clone https://github.com/scipion-em/scipion-em-topaz
+   
 4. Install the Topaz plugin in devel mode:
-   `scipion installp -p ~/scipion-em-topaz --devel`
+::
+   scipion installp -p ~/scipion-em-topaz --devel
 
 
 Topaz integration
@@ -33,15 +39,15 @@ Topaz integration
 
 The following steps presuppose that you have Anaconda or Miniconda installed on your computer.  
 
-| In ~/.config/scipion/scipion.conf: 
+| In ``~/.config/scipion/scipion.conf``: 
 | Set CONDA_ACTIVATION_CMD variable in the Packages section.
-| For example: `CONDA_ACTIVATION_CMD = . ~/anaconda2/etc/profile.d/conda.sh` 
+| For example: ``CONDA_ACTIVATION_CMD = . ~/anaconda2/etc/profile.d/conda.sh``
 | Notice the command starts with a period! This will source the conda.sh script.
   This is needed to activate the conda environment.
 | For further information please visit the following website:
 | https://github.com/conda/conda/blob/master/CHANGELOG.md#440-2017-12-20
 | Set TOPAZ_ACTIVATION_CMD variable in the Packages section. 
-| For example: `TOPAZ_ACTIVATION_CMD = conda activate topaz`
+| For example: ``TOPAZ_ACTIVATION_CMD = conda activate topaz``
 | This will activate the conda environment with the default name topaz.
 
 
