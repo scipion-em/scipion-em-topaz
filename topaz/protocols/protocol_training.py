@@ -193,6 +193,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         self.debug("Loading input db: %s" % setFn)
 
         # Load set of coordinates with a user determined number of coordinates for the training step
+        enoughMicrographs = False
         while True:
             coordSet = SetOfCoordinates(filename=setFn)
             coordSet._xmippMd = params.String()
@@ -201,8 +202,9 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
             for micAgg in coordSet.aggregate(["MAX"], "_micId", ["_micId"]):
                 micIds.append(micAgg["_micId"])
                 if len(micIds) == self.micsForTraining.get():
+                    enoughMicrographs = True
                     break
-            if micAgg["_micId"] == max(micIds):
+            if enoughMicrographs == True:
                 break
             else:
                 if coordSet.isStreamClosed():
