@@ -202,7 +202,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
                 micIds.append(micAgg["_micId"])
                 if len(micIds) == self.micsForTraining.get():
                     break
-            if micAgg["_micId"] == self.micsForTraining.get():
+            if micAgg["_micId"] == max(micIds):
                 break
             else:
                 if coordSet.isStreamClosed():
