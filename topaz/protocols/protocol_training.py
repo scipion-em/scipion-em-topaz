@@ -1,8 +1,10 @@
 # **************************************************************************
 # *
 # * Authors:     J.M. De la Rosa Trevin (delarosatrevin@scilifelab.se) [1]
+# *              Peter Horvath (phorvath@cnb.csic.es) [2]
 # *
 # * [1] SciLifeLab, Stockholm University
+# * [2] I2PC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -83,6 +85,13 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
                       label='Micrographs for training', default=5,
                       help='This number will be divided into training and test data.'
                            'If it is not reached wait')
+        form.addParam('logLikelihoodThreshold', params.FloatParam,
+                      label='Threshold', default=-6,
+                      help='Log-likelihood score threshold at which to terminate region '
+                           'extraction, -6 is p=0.0025. When the probability threshold '
+                           'is decreased the fraction of false positives increases as well as the '
+                           'true positives. The opposite is also true. A few numbers that were tested in '
+                           'the paper: 6.0, 5.5, 5.0, 4.0, 3.0, 0.0, -1.0, -2.0, -3.0, -4.0')
 
 
         group = form.addGroup('Pre-processing')
@@ -107,8 +116,14 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
                             'consider positive. ')
 
         group.addParam('numEpochs', params.IntParam, default=10,
+                       expertLevel=cons.LEVEL_ADVANCED,
                        label='Number of epochs',
                        help='Maximum number of training epochs')
+
+        group.addParam('epochSize', params.IntParam, default=5000,
+                       expertLevel=cons.LEVEL_ADVANCED,
+                       label='Epoch size',
+                       help='Number of parameter updates per epoch')
 
         group.addParam('pi', params.FloatParam, default=0.035,
                        label='Pi',
@@ -147,7 +162,9 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
             self._insertFunctionStep('trainingStep',
                                      self.radius.get(),
                                      self.numEpochs.get(),
-                                     self.pi.get(), self.getEnumText('model'))]
+                                     self.epochSize.get(),
+                                     self.pi.get(),
+                                     self.getEnumText('model'))]
         return id
 
 
@@ -191,6 +208,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         self.debug("Loading input db: %s" % setFn)
 
         # Load set of coordinates with a user determined number of coordinates for the training step
+        enoughMicrographs = False
         while True:
             coordSet = SetOfCoordinates(filename=setFn)
             coordSet._xmippMd = params.String()
@@ -199,8 +217,9 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
             for micAgg in coordSet.aggregate(["MAX"], "_micId", ["_micId"]):
                 micIds.append(micAgg["_micId"])
                 if len(micIds) == self.micsForTraining.get():
+                    enoughMicrographs = True
                     break
-            if micAgg["_micId"] == self.micsForTraining.get():
+            if enoughMicrographs == True:
                 break
             else:
                 if coordSet.isStreamClosed():
@@ -291,7 +310,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (scale, inputDir, outputDir))
 
 
-    def trainingStep(self, radius, numEpochs, pi, model):
+    def trainingStep(self, radius, numEpochs, epochSize, pi, model):
         """ Train the model with the provided parameters and the previously
         preprocessed micrograph images and the provided input coordinates.
         """
@@ -308,6 +327,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         args += ' --num-workers=%d' % self.numberOfThreads
         args += ' --device %s' % self.gpuList
         args += ' --num-epochs %d' % numEpochs
+        args += ' --epoch-size %d' % epochSize
         args += ' --save-prefix=%s/model' % outputDir
         args += ' -o %s/model_training.txt' % outputDir
 
@@ -342,7 +362,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         args += ' -m %s/model_epoch%d.sav' % (modelDir, numEpochs)
         args += ' -o %s' % self.getPickingFileName(micList, TOPAZ_COORDINATES_FILE)
         args += ' %s/*.mrc' % preprocessedDir
-
+        args += ' -t %f' % self.logLikelihoodThreshold
         self.runTopaz('extract %s' % args)
 
 
