@@ -86,7 +86,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
                       help='This number will be divided into training and test data.'
                            'If it is not reached wait')
         form.addParam('logLikelihoodThreshold', params.FloatParam,
-                      label='Threshold', default=-6,
+                      label='Threshold', default=-1,
                       help='Log-likelihood score threshold at which to terminate region '
                            'extraction, -6 is p=0.0025. When the probability threshold '
                            'is decreased the fraction of false positives increases as well as the '
@@ -147,6 +147,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         form.addParallelSection(threads=1, mpi=1)
 
         self._defineStreamingParams(form)
+	form.getParam('streamingBatchSize').setDefault(32)
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertInitialSteps(self):
@@ -288,9 +289,9 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
             CsvCoordinateList(self._getFileName(PARTICLES_TEST_TXT), 'w')
         ]
 
-        for micId in micIds:
-            # Loop through the subset of coordinates that was picked by the previous step
-            for coord in coordSet.iterItems(orderBy='_micId'):
+        for coord in coordSet.iterItems(orderBy='_micId'):
+            micId= coord.getMicId()
+            if micId  in micDict:
                 x = int(round(float(coord.getX()) / scale))
                 y = int(round(float(coord.getY()) / scale))
                 csvParts[micDict[micId]].addCoord(micId, x, y)
