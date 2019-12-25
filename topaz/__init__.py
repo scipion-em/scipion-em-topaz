@@ -27,16 +27,18 @@
 # **************************************************************************
 
 import os
-import pyworkflow.em
+import pwem
 import pyworkflow as pw
-from .constants import CONDA_ACTIVATION_CMD, TOPAZ_ACTIVATION_CMD,DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME
+from .constants import (CONDA_ACTIVATION_CMD, TOPAZ_ACTIVATION_CMD,
+                        DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME)
+
 import topaz
 
 _references = ['Bepler2018']
 _logo = "topaz_logo.jpeg"
 
 
-class Plugin(pw.em.Plugin):
+class Plugin(pwem.Plugin):
     _supportedVersions = []
 
     @classmethod
@@ -49,7 +51,7 @@ class Plugin(pw.em.Plugin):
         correctCondaActivationCmd = condaActivationCmd.replace(pw.Config.SCIPION_HOME + "/", "")
         if not correctCondaActivationCmd:
             print("WARNING!!: CONDA_ACTIVATION_CMD variable not defined. "
-                   "Relying on conda being in the PATH")
+                  "Relying on conda being in the PATH")
         elif correctCondaActivationCmd[-1] != ";":
             correctCondaActivationCmd += ";"
         return correctCondaActivationCmd
@@ -73,7 +75,6 @@ class Plugin(pw.em.Plugin):
 
     @classmethod
     def defineBinaries(cls, env):
-
         TOPAZ_INSTALLED = 'topaz_installed'
 
         # try to get CONDA activation command
@@ -82,11 +83,15 @@ class Plugin(pw.em.Plugin):
         if not condaActivationCmd:
             neededProgs = ['conda']
 
-        installationCmd = '%s conda create -y -n %s;conda activate %s; conda install -y topaz cudatoolkit=9.2 -c tbepler -c pytorch; touch %s' % \
-                           (condaActivationCmd, DEFAULT_ENV_NAME, DEFAULT_ENV_NAME, TOPAZ_INSTALLED)
+        installationCmd = '%s conda create -y -n %s;conda activate %s; '\
+                          'conda install -y topaz cudatoolkit=9.2 '\
+                          '-c tbepler -c pytorch; touch %s' % \
+                          (condaActivationCmd, DEFAULT_ENV_NAME,
+                           DEFAULT_ENV_NAME, TOPAZ_INSTALLED)
         topaz_commands = [(installationCmd, TOPAZ_INSTALLED)]
 
-        envPath = os.environ.get('PATH', "")  # keep path since conda likely in there
+        envPath = os.environ.get('PATH', "")
+        # keep path since conda likely in there
         installEnvVars = {'PATH': envPath} if envPath else None
         env.addPackage('topaz', version='0.2.1',
                        tar='void.tgz',
@@ -96,5 +101,4 @@ class Plugin(pw.em.Plugin):
                        vars=installEnvVars)
 
 
-
-pw.em.Domain.registerPlugin(__name__)
+pwem.Domain.registerPlugin(__name__)

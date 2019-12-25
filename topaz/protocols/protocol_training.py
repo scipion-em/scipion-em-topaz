@@ -28,12 +28,18 @@
 import os
 
 import numpy as np
-from itertools import izip
+try:
+    from itertools import izip
+except ImportError:
+    izip = zip
 
 import pyworkflow as pw
+import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as cons
-from pyworkflow.em import ProtParticlePickingAuto, pwutils, SetOfMicrographs, SetOfCoordinates
+from pwem.protocols import ProtParticlePickingAuto
+from pwem.objects import SetOfMicrographs, SetOfCoordinates
+from pwem.convert import ImageHandler
 
 from topaz import convert
 from .protocol_base import TopazProtocol
@@ -59,7 +65,7 @@ PARTICLES_TEST_TXT = 'particles_test.txt'
 PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 
-class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
+class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
     """ Train the Topaz parameters for a picking
     """
     _label = 'training'
@@ -93,7 +99,6 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
                            'true positives. The opposite is also true. A few numbers that were tested in '
                            'the paper: 6.0, 5.5, 5.0, 4.0, 3.0, 0.0, -1.0, -2.0, -3.0, -4.0')
 
-
         group = form.addGroup('Pre-processing')
 
         group.addParam('scale', params.IntParam, default=4,
@@ -104,7 +109,8 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         group.addParam('splitData', params.IntParam, default=10,
                       label='Split data',
                       help='Data is split into train and test sets. '
-                           'E.g.:10 means 10% of the number of micrographs selected for training and associated labeled '
+                           'E.g.:10 means 10% of the number of micrographs '
+                           'selected for training and associated labeled '
                            'particles will go into the test set, 90% will go into the train set.')
 
 
@@ -150,30 +156,25 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertInitialSteps(self):
-
         self._defineFileDict()
-
         id = [self._insertFunctionStep('convertInputStep',
-                                     self.inputCoordinates.getObjId(),
-                                     self.splitData.get(),
-                                     self.scale.get()),
+                                       self.inputCoordinates.getObjId(),
+                                       self.splitData.get(),
+                                       self.scale.get()),
               self._insertFunctionStep('preprocessStep',
-                                     self.scale.get()),
-            self._insertFunctionStep('trainingStep',
-                                     self.radius.get(),
-                                     self.numEpochs.get(),
-                                     self.epochSize.get(),
-                                     self.pi.get(),
-                                     self.getEnumText('model'))]
+                                       self.scale.get()),
+              self._insertFunctionStep('trainingStep',
+                                       self.radius.get(),
+                                       self.numEpochs.get(),
+                                       self.epochSize.get(),
+                                       self.pi.get(),
+                                       self.getEnumText('model'))]
         return id
-
-
 
     def _defineFileDict(self):
         """ Centralize how files are called for iterations and references. """
         trainingFolder = self._getTmpPath("training")
         trainpreFolder = os.path.join(trainingFolder, "preprocess")
-
 
         pickingFolder = self._getTmpPath("micrographs%(min)s-%(max)s")
         pickingPreFolder = os.path.join(pickingFolder, "preprocess")
@@ -219,7 +220,7 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
                 if len(micIds) == self.micsForTraining.get():
                     enoughMicrographs = True
                     break
-            if enoughMicrographs == True:
+            if enoughMicrographs:
                 break
             else:
                 if coordSet.isStreamClosed():
@@ -234,10 +235,11 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         prepDir = self._getFileName(TRAININGPREPROCESS)
         pw.utils.makePath(prepDir)
 
-        ih = pw.em.ImageHandler()
+        ih = ImageHandler()
 
         # Get a refreshed set of micrographs
-        micsFn = self.inputCoordinates.get().getMicrographs().getFileName()   # not updating, refresh problem
+        micsFn = self.inputCoordinates.get().getMicrographs().getFileName()
+        # not updating, refresh problem
         coordMics = SetOfMicrographs(filename=micsFn)
         coordMics.loadAllProperties()
 
@@ -289,7 +291,8 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         ]
 
         for micId in micIds:
-            # Loop through the subset of coordinates that was picked by the previous step
+            # Loop through the subset of coordinates that was
+            # picked by the previous step
             for coord in coordSet.iterItems(orderBy='_micId'):
                 x = int(round(float(coord.getX()) / scale))
                 y = int(round(float(coord.getY()) / scale))
@@ -307,7 +310,8 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         pwutils.makePath(inputDir)
         outputDir = self._getFileName(TRAININGPREPROCESS)
         pwutils.makePath(outputDir)
-        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (scale, inputDir, outputDir))
+        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (scale, inputDir,
+                                                           outputDir))
 
 
     def trainingStep(self, radius, numEpochs, epochSize, pi, model):
@@ -344,12 +348,15 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
 
         convert.convertMicrographs(micList, workingDir)
 
-        # create preprocessed folder under the workingDir. Now in the extra folder should be replaced in tmp folder
+        # create preprocessed folder under the workingDir.
+        # Now in the extra folder should be replaced in tmp folder
         preprocessedDir = self.getPickingFileName(micList, PICKING_PRE_FOLDER)
         pwutils.makePath(preprocessedDir)
 
         # preprocess the micrographs in the batch folder, output in preprocessedDir
-        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (self.scale.get(), workingDir, preprocessedDir))
+        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (self.scale.get(),
+                                                           workingDir,
+                                                           preprocessedDir))
 
         # perform prediction on the preprocessed micrographs
         boxSize = self.boxSize.get()
@@ -360,26 +367,26 @@ class TopazProtTraining(pw.em.ProtParticlePickingAuto, TopazProtocol):
         extractRadius = (boxSize / 2) / self.scale.get()
         args = '-r%d' % extractRadius
         args += ' -m %s/model_epoch%d.sav' % (modelDir, numEpochs)
-        args += ' -o %s' % self.getPickingFileName(micList, TOPAZ_COORDINATES_FILE)
+        args += ' -o %s' % self.getPickingFileName(micList,
+                                                   TOPAZ_COORDINATES_FILE)
         args += ' %s/*.mrc' % preprocessedDir
         args += ' -t %f' % self.logLikelihoodThreshold
         self.runTopaz('extract %s' % args)
 
-
     def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
         """ Read the coordinates from a given list of micrographs """
 
-        outputParticlesFn = self.getPickingFileName(micDoneList, TOPAZ_COORDINATES_FILE)
+        outputParticlesFn = self.getPickingFileName(micDoneList,
+                                                    TOPAZ_COORDINATES_FILE)
 
         scale = self.scale.get()
-        readSetOfCoordinates(outputParticlesFn, outputCoords.getMicrographs(), outputCoords, scale)
+        readSetOfCoordinates(outputParticlesFn, outputCoords.getMicrographs(),
+                             outputCoords, scale)
 
         boxSize = self.boxSize.get()
         outputCoords.setBoxSize(boxSize)
 
     # --------------------------- UTILS functions --------------------------
     def getPickingFileName(self, micList, key):
-
-        return self._getFileName(key, **{"min": micList[0].strId(), 'max': micList[-1].strId()})
-
-
+        return self._getFileName(key, **{"min": micList[0].strId(),
+                                         'max': micList[-1].strId()})
