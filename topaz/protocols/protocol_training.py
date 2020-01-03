@@ -113,7 +113,6 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
                            'selected for training and associated labeled '
                            'particles will go into the test set, 90% will go into the train set.')
 
-
         group = form.addGroup('Training')
 
         group.addParam('radius', params.IntParam, default=0,
@@ -142,13 +141,13 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
                        help='Model type to fit.')
 
         form.addHidden(params.GPU_LIST, params.StringParam, default='0',
-                         expertLevel=cons.LEVEL_ADVANCED,
-                         label="Choose GPU IDs",
-                         help="GPU may have several cores. Set it to zero"
-                              " if you do not know what we are talking about."
-                              " First core index is 0, second 1 and so on."
-                              " Motioncor2 can use multiple GPUs - in that case"
-                              " set to i.e. *0 1 2*.")
+                       expertLevel=cons.LEVEL_ADVANCED,
+                       label="Choose GPU IDs",
+                       help="GPU may have several cores. Set it to zero"
+                            " if you do not know what we are talking about."
+                            " First core index is 0, second 1 and so on."
+                            " Motioncor2 can use multiple GPUs - in that case"
+                            " set to i.e. *0 1 2*.")
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -312,7 +311,6 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
         pwutils.makePath(outputDir)
         self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (scale, inputDir,
                                                            outputDir))
-
 
     def trainingStep(self, radius, numEpochs, epochSize, pi, model):
         """ Train the model with the provided parameters and the previously

@@ -32,7 +32,6 @@ import pyworkflow as pw
 from .constants import (CONDA_ACTIVATION_CMD, TOPAZ_ACTIVATION_CMD,
                         DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME)
 
-import topaz
 
 _references = ['Bepler2018']
 _logo = "topaz_logo.jpeg"
