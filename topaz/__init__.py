@@ -98,6 +98,3 @@ class Plugin(pwem.Plugin):
                        neededProgs=neededProgs,
                        default=True,
                        vars=installEnvVars)
-
-
-pwem.Domain.registerPlugin(__name__)
