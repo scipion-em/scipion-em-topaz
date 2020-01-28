@@ -39,7 +39,7 @@ import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as cons
 from pwem.protocols import ProtParticlePickingAuto
 from pwem.objects import SetOfMicrographs, SetOfCoordinates
-from pwem.convert import ImageHandler
+from pwem.emlib.image import ImageHandler
 
 from topaz import convert
 from .protocol_base import TopazProtocol

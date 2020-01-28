@@ -31,7 +31,7 @@ import os
 
 import pyworkflow.utils as pwutils
 from pyworkflow.object import Float
-from pwem.convert import ImageHandler
+from pwem.emlib.image import ImageHandler
 from pwem.objects import Coordinate
 
 from topaz import constants
