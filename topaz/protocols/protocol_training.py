@@ -28,10 +28,6 @@
 import os
 
 import numpy as np
-try:
-    from itertools import izip
-except ImportError:
-    izip = zip
 
 import pyworkflow as pw
 import pyworkflow.utils as pwutils
@@ -156,7 +152,7 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
     # -------------------------- INSERT steps functions -----------------------
     def _insertInitialSteps(self):
         self._defineFileDict()
-        id = [self._insertFunctionStep('convertInputStep',
+        ids = [self._insertFunctionStep('convertInputStep',
                                        self.inputCoordinates.getObjId(),
                                        self.splitData.get(),
                                        self.scale.get()),
@@ -168,7 +164,7 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
                                        self.epochSize.get(),
                                        self.pi.get(),
                                        self.getEnumText('model'))]
-        return id
+        return ids
 
     def _defineFileDict(self):
         """ Centralize how files are called for iterations and references. """
@@ -265,7 +261,7 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
 
         # Store the micId and indexes in micDict
         micDict = {}
-        for i, micId in izip(indexes, micIds):
+        for i, micId in zip(indexes, micIds):
             mic = coordMics[micId]
             micFn = mic.getFileName()
             baseFn = pw.utils.removeBaseExt(micFn)
