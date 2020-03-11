@@ -29,7 +29,6 @@
 DEFAULT_ENV_NAME = "topaz"
 DEFAULT_ACTIVATION_CMD = 'conda activate ' + DEFAULT_ENV_NAME
 TOPAZ_ACTIVATION_CMD = 'TOPAZ_ACTIVATION_CMD'
-CONDA_ACTIVATION_CMD = 'CONDA_ACTIVATION_CMD'
 
 # Topaz supported input formats for micrographs
 TOPAZ_SUPPORTED_FORMATS = [".mrc", ".tiff", ".png"]

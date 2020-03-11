@@ -29,8 +29,7 @@
 import os
 import pwem
 import pyworkflow as pw
-from .constants import (CONDA_ACTIVATION_CMD, TOPAZ_ACTIVATION_CMD,
-                        DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME)
+from .constants import (TOPAZ_ACTIVATION_CMD, DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME)
 
 
 _references = ['Bepler2018']
@@ -43,17 +42,6 @@ class Plugin(pwem.Plugin):
     @classmethod
     def _defineVariables(cls):
         cls._defineVar(TOPAZ_ACTIVATION_CMD, DEFAULT_ACTIVATION_CMD)
-
-    @classmethod
-    def getCondaActivationCmd(cls):
-        condaActivationCmd = os.environ.get('CONDA_ACTIVATION_CMD', "")
-        correctCondaActivationCmd = condaActivationCmd.replace(pw.Config.SCIPION_HOME + "/", "")
-        if not correctCondaActivationCmd:
-            print("WARNING!!: CONDA_ACTIVATION_CMD variable not defined. "
-                  "Relying on conda being in the PATH")
-        elif correctCondaActivationCmd[-1] != ";":
-            correctCondaActivationCmd += ";"
-        return correctCondaActivationCmd
 
     @classmethod
     def getTopazEnvActivation(cls):
