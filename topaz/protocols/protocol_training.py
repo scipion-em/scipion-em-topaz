@@ -37,22 +37,20 @@ from pwem.protocols import ProtParticlePickingAuto
 from pwem.objects import SetOfMicrographs, SetOfCoordinates
 from pwem.emlib.image import ImageHandler
 
-from topaz import convert
-from .protocol_base import TopazProtocol
+from topaz import convert, Plugin
 
 from topaz.convert import (CsvMicrographList, CsvCoordinateList,
                            readSetOfCoordinates)
 
 
 TOPAZ_COORDINATES_FILE = 'topaz_coordinates_file'
-
+PICKING_DENOISE_FOLDER = 'picking_denoise_folder'
 PICKING_PRE_FOLDER = 'picking_pre_folder'
-
 PICKING_FOLDER = 'picking_folder'
-
 MODEL_FOLDER = 'model_folder'
 TRAINING = 'training'
 TRAINING_MIC = 'trainingMic'
+TRAININGDENOISE = 'trainingdenoise'
 TRAININGPREPROCESS = 'trainingpreprocess'
 TRAININGPRE_MIC = 'trainingpreMic'
 TRAININGLIST = 'traininglist'
@@ -61,7 +59,7 @@ PARTICLES_TEST_TXT = 'particles_test.txt'
 PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 
-class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
+class TopazProtTraining(ProtParticlePickingAuto):
     """ Train the Topaz parameters for a picking
     """
     _label = 'training'
@@ -79,71 +77,91 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
                       label='Input coordinates', important=True,
                       help='Select the SetOfCoordinates to be used for '
                            'training.')
-
         form.addParam('boxSize', params.IntParam, default=100,
-                      label='Box Size', help='Box size in pixels')
-
+                      label='Box size (px)', help='Box size in pixels.')
         form.addParam('micsForTraining', params.IntParam,
                       label='Micrographs for training', default=5,
                       help='This number will be divided into training and test data.'
                            'If it is not reached wait')
-        form.addParam('logLikelihoodThreshold', params.FloatParam,
-                      label='Threshold', default=-6,
-                      help='Log-likelihood score threshold at which to terminate region '
-                           'extraction, -6 is p=0.0025. When the probability threshold '
-                           'is decreased the fraction of false positives increases as well as the '
-                           'true positives. The opposite is also true. A few numbers that were tested in '
-                           'the paper: 6.0, 5.5, 5.0, 4.0, 3.0, 0.0, -1.0, -2.0, -3.0, -4.0')
 
-        group = form.addGroup('Pre-processing')
-
-        group.addParam('scale', params.IntParam, default=4,
-                       label='Scale',
-                       help='Factor to down-scale the micrographs for '
-                            'pre-processing')
-
-        group.addParam('splitData', params.IntParam, default=10,
-                      label='Split data',
-                      help='Data is split into train and test sets. '
-                           'E.g.:10 means 10% of the number of micrographs '
-                           'selected for training and associated labeled '
-                           'particles will go into the test set, 90% will go into the train set.')
-
-        group = form.addGroup('Training')
-
-        group.addParam('radius', params.IntParam, default=0,
-                       label='Radius (px)',
-                       help='Radius (in pixels) around particle centers to '
-                            'consider positive. ')
-
-        group.addParam('numEpochs', params.IntParam, default=10,
-                       expertLevel=cons.LEVEL_ADVANCED,
-                       label='Number of epochs',
-                       help='Maximum number of training epochs')
-
-        group.addParam('epochSize', params.IntParam, default=5000,
-                       expertLevel=cons.LEVEL_ADVANCED,
-                       label='Epoch size',
-                       help='Number of parameter updates per epoch')
-
-        group.addParam('pi', params.FloatParam, default=0.035,
-                       label='Pi',
-                       help='Parameter specifying fraction of data that is '
-                            'expected to be positive. Pi<0.05')
-
-        group.addParam('model', params.EnumParam, default=0,
-                       choices=['resnet8', 'conv31', 'conv63', 'conv127'],
+        form.addSection('Pre-process')
+        group = form.addGroup('Denoise')
+        group.addParam('doDenoise', params.BooleanParam, default=False,
+                       label="Denoise micrographs?")
+        group.addParam('modelDenoise', params.EnumParam, default=0,
+                       condition='doDenoise',
+                       choices=['unet', 'unet-small', 'fcnn', 'affineresnet8'],
                        label='Model',
-                       help='Model type to fit.')
+                       help='Denoising model to use on micrographs.')
+        group.addParam('denoiseExtra', params.StringParam, default='',
+                       expertLevel=cons.LEVEL_ADVANCED,
+                       label="Advanced options",
+                       help="Provide advanced command line options here.")
+
+        group = form.addGroup('Pre-process')
+        group.addParam('scale', params.IntParam, default=4,
+                       label='Scale factor',
+                       help='Scaling factor for image downsampling.\n'
+                            'Downsample such that the resulting pixel size '
+                            'is about 8 Angstroms.')
+        group.addParam('preExtra', params.StringParam, default='',
+                       expertLevel=cons.LEVEL_ADVANCED,
+                       label="Advanced options",
+                       help="Provide advanced command line options here.")
+
+        form.addSection('Train')
+        form.addParam('radius', params.IntParam, default=0,
+                      label='Particle radius (px)',
+                      help='Pixel radius around particle centers to '
+                           'consider.')
+        form.addParam('autoenc', params.FloatParam, default=0.,
+                      label='Autoencoder',
+                      help='Augment the method with autoencoder '
+                           'where the weight is on reconstruction error.')
+        form.addParam('numEpochs', params.IntParam, default=10,
+                      label='Number of epochs',
+                      help='Number of training epochs.')
+        form.addParam('modelFit', params.EnumParam, default=0,
+                      expertLevel=cons.LEVEL_ADVANCED,
+                      choices=['resnet8', 'conv31', 'conv63', 'conv127'],
+                      label='CNN model',
+                      help='Model type to fit.\n Your particle must have '
+                           'a diameter (longest dimension) after '
+                           'downsampling of:\n\n'
+                           '<= 70px for resnet8\n'
+                           '<= 30px for conv31\n'
+                           '<= 62px for conv63\n'
+                           '<= 126px for conv127\n')
+        form.addParam('method', params.EnumParam, default=2,
+                      expertLevel=cons.LEVEL_ADVANCED,
+                      choices=['PN', 'GE-KL', 'GE-binomial', 'PU'],
+                      label='Method',
+                      help='Objective function to use for learning the '
+                           'region classifier.')
+        form.addParam('numPartPerImg', params.IntParam, default=300,
+                      expertLevel=cons.LEVEL_ADVANCED,
+                      label='Number of particles per image',
+                      help='Expected number of particles per micrograph.')
+        form.addParam('kfold', params.IntParam, default=5,
+                      expertLevel=cons.LEVEL_ADVANCED,
+                      label='K-fold',
+                      help='Number of subsets to divide the training '
+                           'micrographs into. This will determine the '
+                           'train/test dataset sizes. E.g. *5* splits the '
+                           'picks into five micrograph subsets where one '
+                           'will be used as the test dataset; '
+                           '20% will be held-out for validation')
+        form.addParam('trainExtra', params.StringParam, default='',
+                      expertLevel=cons.LEVEL_ADVANCED,
+                      label="Advanced options",
+                      help="Provide advanced command line options here.")
 
         form.addHidden(params.GPU_LIST, params.StringParam, default='0',
                        expertLevel=cons.LEVEL_ADVANCED,
                        label="Choose GPU IDs",
                        help="GPU may have several cores. Set it to zero"
                             " if you do not know what we are talking about."
-                            " First core index is 0, second 1 and so on."
-                            " Motioncor2 can use multiple GPUs - in that case"
-                            " set to i.e. *0 1 2*.")
+                            " First core index is 0, second 1 and so on.")
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -153,29 +171,41 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
     def _insertInitialSteps(self):
         self._defineFileDict()
         ids = [self._insertFunctionStep('convertInputStep',
-                                       self.inputCoordinates.getObjId(),
-                                       self.splitData.get(),
-                                       self.scale.get()),
-              self._insertFunctionStep('preprocessStep',
-                                       self.scale.get()),
-              self._insertFunctionStep('trainingStep',
-                                       self.radius.get(),
-                                       self.numEpochs.get(),
-                                       self.epochSize.get(),
-                                       self.pi.get(),
-                                       self.getEnumText('model'))]
+                                        self.inputCoordinates.getObjId(),
+                                        self.scale.get(),
+                                        self.kfold.get())]
+        if self.doDenoise:
+            ids += [self._insertFunctionStep('denoiseStep',
+                                             self.getEnumText('modelDenoise'),
+                                             self.denoiseExtra.get())]
+
+        ids += [self._insertFunctionStep('preprocessStep',
+                                         self.scale.get(),
+                                         self.preExtra.get())]
+
+        ids += [self._insertFunctionStep('trainingStep',
+                                         self.radius.get(),
+                                         self.autoenc.get(),
+                                         self.numEpochs.get(),
+                                         self.getEnumText('modelFit'),
+                                         self.getEnumText('method'),
+                                         self.numPartPerImg.get(),
+                                         self.trainExtra.get())]
         return ids
 
     def _defineFileDict(self):
         """ Centralize how files are called for iterations and references. """
         trainingFolder = self._getTmpPath("training")
+        traindenoiseFolder = os.path.join(trainingFolder, "denoise")
         trainpreFolder = os.path.join(trainingFolder, "preprocess")
 
         pickingFolder = self._getTmpPath("micrographs%(min)s-%(max)s")
+        pickingDenoiseFolder = os.path.join(pickingFolder, "denoise")
         pickingPreFolder = os.path.join(pickingFolder, "preprocess")
         myDict = {
             TRAINING: trainingFolder,
             TRAINING_MIC: os.path.join(trainingFolder, '%(mic)s.mrc'),
+            TRAININGDENOISE: traindenoiseFolder,
             TRAININGPREPROCESS: trainpreFolder,
             TRAININGPRE_MIC: os.path.join(trainpreFolder, '%(mic)s.mrc'),
             TRAININGLIST: os.path.join(trainpreFolder, 'image_list_train.txt'),
@@ -184,18 +214,20 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
             PARTICLES_TEST_TXT: os.path.join(trainpreFolder, 'particles_test_test.txt'),
             MODEL_FOLDER: os.path.join(trainpreFolder, "model"),
             PICKING_FOLDER: pickingFolder,
+            PICKING_DENOISE_FOLDER: pickingDenoiseFolder,
             PICKING_PRE_FOLDER: pickingPreFolder,
-            TOPAZ_COORDINATES_FILE: os.path.join(pickingPreFolder, "topaz_coordinates%(min)s-%(max)s.txt")
+            TOPAZ_COORDINATES_FILE: os.path.join(pickingPreFolder,
+                                                 "topaz_coordinates%(min)s-%(max)s.txt")
         }
 
         self._updateFilenamesDict(myDict)
 
     # --------------------------- STEPS functions ------------------------------
 
-    def convertInputStep(self, inputCoordinates, splitData, scale):
+    def convertInputStep(self, inputCoordinates, scale, kfold):
         """ Converts a set of coordinates to box files and binaries to mrc
         if needed. It generates 2 folders 1 for the box files and another for
-        the mrc files. To be passed (the folders as params for cryolo)
+        the mrc files.
         """
 
         micIds = []
@@ -241,7 +273,7 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
         # Create a 0/1 list to mark micrographs for training/testing
         n = len(micIds)
         indexes = np.zeros(n, dtype='int8')
-        testSetImages = int((splitData / float(100)) * n)
+        testSetImages = int((kfold / float(100)) * n)
 
         # Both the training and the test data set should contain at least one micrograph
         if testSetImages < 1:
@@ -296,19 +328,32 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
         for csv in csvParts:
             csv.close()
 
-    def preprocessStep(self, scale):
+    def denoiseStep(self, modelNoise, extra):
+        inputDir = self._getFileName(TRAINING)
+        outputDir = self._getFileName(TRAININGDENOISE)
+        pwutils.makePath(outputDir)
+
+        args = self.getDenoiseArgs(inputDir, outputDir)
+        Plugin.runTopaz(self, 'topaz denoise', args)
+
+    def preprocessStep(self, scale, extra):
         """ Downsamples the micrographs with a factor determined
         by the scale parameter and normalize them with the per-micrograph
         scaled Gaussian mixture model"""
 
-        inputDir = self._getFileName(TRAINING)
+        if self.doDenoise:
+            inputDir = self._getFileName(TRAININGDENOISE)
+        else:
+            inputDir = self._getFileName(TRAINING)
         pwutils.makePath(inputDir)
         outputDir = self._getFileName(TRAININGPREPROCESS)
         pwutils.makePath(outputDir)
-        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (scale, inputDir,
-                                                           outputDir))
 
-    def trainingStep(self, radius, numEpochs, epochSize, pi, model):
+        args = self.getPreprocessArgs(inputDir, outputDir)
+        Plugin.runTopaz(self, 'topaz preprocess', args)
+
+    def trainingStep(self, radius, enc, numEpochs, modelFit,
+                     method, numParts, extra):
         """ Train the model with the provided parameters and the previously
         preprocessed micrograph images and the provided input coordinates.
         """
@@ -316,20 +361,24 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
         pw.utils.makePath(outputDir)
 
         args = ' --radius %d' % radius
-        args += ' --pi %f' % pi
-        args += ' --model %s' % model
+        args += ' --autoencoder %f' % enc
+        args += ' --num-epochs %d' % numEpochs
+        args += ' --model %s' % modelFit
+        args += ' --method %s' % method
+        args += ' --num-particles %d' % numParts
         args += ' --train-images %s' % self._getFileName(TRAININGLIST)
         args += ' --train-targets %s' % self._getFileName(PARTICLES_TRAIN_TXT)
         args += ' --test-images %s' % self._getFileName(TRAININGTEST)
         args += ' --test-targets %s' % self._getFileName(PARTICLES_TEST_TXT)
-        args += ' --num-workers=%d' % self.numberOfThreads
+        args += ' --num-workers %d' % self.numberOfThreads
         args += ' --device %s' % self.gpuList
-        args += ' --num-epochs %d' % numEpochs
-        args += ' --epoch-size %d' % epochSize
-        args += ' --save-prefix=%s/model' % outputDir
+        args += ' --save-prefix %s/model' % outputDir
         args += ' -o %s/model_training.txt' % outputDir
 
-        self.runTopaz('train %s' % args)
+        if extra != '':
+            args += ' ' + extra
+
+        Plugin.runTopaz(self, 'topaz train', args)
 
     def _pickMicrograph(self, micrograph, *args):
         """Picking the given micrograph. """
@@ -342,15 +391,22 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
 
         convert.convertMicrographs(micList, workingDir)
 
+        if self.doDenoise:
+            denoisedDir = self.getPickingFileName(micList, PICKING_DENOISE_FOLDER)
+            pwutils.makePath(denoisedDir)
+            # denoise the micrographs in the batch folder, output in denoisedDir
+            args = self.getDenoiseArgs(workingDir, denoisedDir)
+            Plugin.runTopaz(self, 'topaz denoise', args)
+            workingDir = denoisedDir
+
         # create preprocessed folder under the workingDir.
         # Now in the extra folder should be replaced in tmp folder
         preprocessedDir = self.getPickingFileName(micList, PICKING_PRE_FOLDER)
         pwutils.makePath(preprocessedDir)
 
         # preprocess the micrographs in the batch folder, output in preprocessedDir
-        self.runTopaz('preprocess -s%d %s/*.mrc -o %s/' % (self.scale.get(),
-                                                           workingDir,
-                                                           preprocessedDir))
+        args = self.getPreprocessArgs(workingDir, preprocessedDir)
+        Plugin.runTopaz(self, 'topaz preprocess', args)
 
         # perform prediction on the preprocessed micrographs
         boxSize = self.boxSize.get()
@@ -359,13 +415,14 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
 
         # Launch process called extract which is rather a prediction
         extractRadius = (boxSize / 2) / self.scale.get()
-        args = '-r%d' % extractRadius
+        args = ' -r %d' % extractRadius
         args += ' -m %s/model_epoch%d.sav' % (modelDir, numEpochs)
         args += ' -o %s' % self.getPickingFileName(micList,
                                                    TOPAZ_COORDINATES_FILE)
+        args += ' --num-workers %d' % self.numberOfThreads
+        args += ' --device %s' % self.gpuList
         args += ' %s/*.mrc' % preprocessedDir
-        args += ' -t %f' % self.logLikelihoodThreshold
-        self.runTopaz('extract %s' % args)
+        Plugin.runTopaz(self, 'topaz extract', args)
 
     def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
         """ Read the coordinates from a given list of micrographs """
@@ -384,3 +441,26 @@ class TopazProtTraining(ProtParticlePickingAuto, TopazProtocol):
     def getPickingFileName(self, micList, key):
         return self._getFileName(key, **{"min": micList[0].strId(),
                                          'max': micList[-1].strId()})
+
+    def getDenoiseArgs(self, inputDir, outDir):
+        args = ' %s/*.mrc -o %s/' % (inputDir, outDir)
+        args += ' --model %s' % self.getEnumText('modelDenoise')
+        args += ' --device %s' % self.gpuList
+
+        if self.denoiseExtra.hasValue():
+            args += ' ' + self.denoiseExtra.get()
+        else:
+            args += ' --normalize'
+
+        return args
+
+    def getPreprocessArgs(self, inputDir, outDir):
+        args = " %s/*.mrc -o %s/" % (inputDir, outDir)
+        args += " --scale %d " % self.scale.get()
+        args += ' --num-workers %d' % self.numberOfThreads
+        args += ' --device %s' % self.gpuList
+
+        if self.preExtra.hasValue():
+            args += ' ' + self.preExtra.get()
+
+        return args

@@ -26,9 +26,17 @@
 # *
 # **************************************************************************
 
-DEFAULT_ENV_NAME = "topaz"
+
+def getTopazEnvName(version):
+    return "topaz-%s" % version
+
+V0_2_3 = "0.2.3"
+VERSIONS = [V0_2_3]
+TOPAZ_DEFAULT_VER_NUM = V0_2_3
+
+DEFAULT_ENV_NAME = getTopazEnvName(TOPAZ_DEFAULT_VER_NUM)
 DEFAULT_ACTIVATION_CMD = 'conda activate ' + DEFAULT_ENV_NAME
-TOPAZ_ACTIVATION_CMD = 'TOPAZ_ACTIVATION_CMD'
+TOPAZ_ENV_ACTIVATION = 'TOPAZ_ENV_ACTIVATION'
 
 # Topaz supported input formats for micrographs
 TOPAZ_SUPPORTED_FORMATS = [".mrc", ".tiff", ".png"]
