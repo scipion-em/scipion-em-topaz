@@ -164,6 +164,7 @@ class TopazProtTraining(ProtParticlePickingAuto):
         form.addParallelSection(threads=1, mpi=1)
 
         self._defineStreamingParams(form)
+	form.getParam('streamingBatchSize').setDefault(32)
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertInitialSteps(self):
@@ -315,10 +316,9 @@ class TopazProtTraining(ProtParticlePickingAuto):
             CsvCoordinateList(self._getFileName(PARTICLES_TEST_TXT), 'w')
         ]
 
-        for micId in micIds:
-            # Loop through the subset of coordinates that was
-            # picked by the previous step
-            for coord in coordSet.iterItems(orderBy='_micId'):
+        for coord in coordSet.iterItems(orderBy='_micId'):
+            micId = coord.getMicId()
+            if micId  in micDict:
                 x = int(round(float(coord.getX()) / scale))
                 y = int(round(float(coord.getY()) / scale))
                 csvParts[micDict[micId]].addCoord(micId, x, y)
