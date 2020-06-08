@@ -8,7 +8,7 @@
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
-# * the Free Software Foundation; either version 2 of the License, or
+# * the Free Software Foundation; either version 3 of the License, or
 # * (at your option) any later version.
 # *
 # * This program is distributed in the hope that it will be useful,
@@ -26,9 +26,17 @@
 # *
 # **************************************************************************
 
-DEFAULT_ENV_NAME = "topaz"
+
+def getTopazEnvName(version):
+    return "topaz-%s" % version
+
+V0_2_3 = "0.2.3"
+VERSIONS = [V0_2_3]
+TOPAZ_DEFAULT_VER_NUM = V0_2_3
+
+DEFAULT_ENV_NAME = getTopazEnvName(TOPAZ_DEFAULT_VER_NUM)
 DEFAULT_ACTIVATION_CMD = 'conda activate ' + DEFAULT_ENV_NAME
-TOPAZ_ACTIVATION_CMD = 'TOPAZ_ACTIVATION_CMD'
+TOPAZ_ENV_ACTIVATION = 'TOPAZ_ENV_ACTIVATION'
 
 # Topaz supported input formats for micrographs
 TOPAZ_SUPPORTED_FORMATS = [".mrc", ".tiff", ".png"]

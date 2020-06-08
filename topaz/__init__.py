@@ -8,7 +8,7 @@
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
-# * the Free Software Foundation; either version 2 of the License, or
+# * the Free Software Foundation; either version 3 of the License, or
 # * (at your option) any later version.
 # *
 # * This program is distributed in the hope that it will be useful,
@@ -27,9 +27,12 @@
 # **************************************************************************
 
 import os
+
 import pwem
+import pyworkflow.utils as pwutils
 import pyworkflow as pw
-from .constants import (TOPAZ_ACTIVATION_CMD, DEFAULT_ACTIVATION_CMD, DEFAULT_ENV_NAME)
+
+from .constants import *
 
 
 _references = ['Bepler2018']
@@ -41,48 +44,76 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def _defineVariables(cls):
-        cls._defineVar(TOPAZ_ACTIVATION_CMD, DEFAULT_ACTIVATION_CMD)
+        cls._defineVar(TOPAZ_ENV_ACTIVATION, DEFAULT_ACTIVATION_CMD)
 
     @classmethod
     def getTopazEnvActivation(cls):
         """ Remove the scipion home and activate the conda topaz environment. """
-        topazActivationCmd = cls.getVar(TOPAZ_ACTIVATION_CMD)
-        correctCommand = topazActivationCmd.replace(pw.Config.SCIPION_HOME + "/", "")
+        activation = cls.getVar(TOPAZ_ENV_ACTIVATION)
+        scipionHome = pw.Config.SCIPION_HOME + os.path.sep
 
-        return cls.getCondaActivationCmd() + " " + correctCommand
+        return activation.replace(scipionHome, "", 1)
 
     @classmethod
     def getEnviron(cls):
         """ Setup the environment variables needed to launch topaz. """
-        environ = pw.utils.Environ(os.environ)
+        environ = pwutils.Environ(os.environ)
         if 'PYTHONPATH' in environ:
             # this is required for python virtual env to work
             del environ['PYTHONPATH']
         return environ
 
     @classmethod
-    def defineBinaries(cls, env):
-        TOPAZ_INSTALLED = 'topaz_installed'
-
+    def getDependencies(cls):
         # try to get CONDA activation command
         condaActivationCmd = cls.getCondaActivationCmd()
-        neededProgs = []
+        neededProgs = ['wget']
         if not condaActivationCmd:
-            neededProgs = ['conda']
+            neededProgs.append('conda')
 
-        installationCmd = '%s conda create -y -n %s;conda activate %s; '\
-                          'conda install -y topaz cudatoolkit=9.2 '\
-                          '-c tbepler -c pytorch; touch %s' % \
-                          (condaActivationCmd, DEFAULT_ENV_NAME,
-                           DEFAULT_ENV_NAME, TOPAZ_INSTALLED)
+        return neededProgs
+
+    @classmethod
+    def defineBinaries(cls, env):
+        cls.addTopazPackage(env, TOPAZ_DEFAULT_VER_NUM,
+                            default=bool(cls.getCondaActivationCmd()))
+
+    @classmethod
+    def addTopazPackage(cls, env, version, default=False):
+        TOPAZ_INSTALLED = 'topaz_%s_installed' % version
+        ENV_NAME = getTopazEnvName(version)
+        # try to get CONDA activation command
+        installationCmd = cls.getCondaActivationCmd()
+
+        # Create the environment
+        installationCmd += 'conda create -y -n %s python=3.6;'\
+                           % ENV_NAME
+
+        # Activate the new environment
+        installationCmd += 'conda activate %s;' % ENV_NAME
+
+        # Install downloaded code
+        installationCmd += 'conda install -y topaz=%s cudatoolkit=9.2 '\
+                           'future -c tbepler -c pytorch;' % version
+
+        # Flag installation finished
+        installationCmd += 'touch %s' % TOPAZ_INSTALLED
+
         topaz_commands = [(installationCmd, TOPAZ_INSTALLED)]
 
         envPath = os.environ.get('PATH', "")
         # keep path since conda likely in there
         installEnvVars = {'PATH': envPath} if envPath else None
-        env.addPackage('topaz', version='0.2.1',
+        env.addPackage('topaz', version=version,
                        tar='void.tgz',
                        commands=topaz_commands,
-                       neededProgs=neededProgs,
-                       default=True,
+                       neededProgs=cls.getDependencies(),
+                       default=default,
                        vars=installEnvVars)
+
+    @classmethod
+    def runTopaz(cls, protocol, program, args, cwd=None):
+        """ Run Topaz command from a given protocol. """
+        fullProgram = '%s %s && %s' % (cls.getCondaActivationCmd(),
+                                       cls.getTopazEnvActivation(), program)
+        protocol.runJob(fullProgram, args, env=cls.getEnviron(), cwd=cwd)
