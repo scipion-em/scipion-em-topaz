@@ -8,7 +8,7 @@
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
-# * the Free Software Foundation; either version 2 of the License, or
+# * the Free Software Foundation; either version 3 of the License, or
 # * (at your option) any later version.
 # *
 # * This program is distributed in the hope that it will be useful,
@@ -30,7 +30,9 @@ import csv
 import os
 
 import pyworkflow.utils as pwutils
-import pyworkflow as pw
+from pyworkflow.object import Float
+from pwem.emlib.image import ImageHandler
+from pwem.objects import Coordinate
 
 from topaz import constants
 
@@ -88,7 +90,7 @@ def convertMicrographs(micList, micDir):
     """ Convert (or simply link) input micrographs into the given directory
     in a format that is compatible with Topaz.
     """
-    ih = pw.em.ImageHandler()
+    ih = ImageHandler()
     ext = pwutils.getExt(micList[0].getFileName())
 
     def _convert(mic, newName):
@@ -119,8 +121,8 @@ def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet, scale):
     csv = CsvCoordinateList(coordinatesCsvFn, score=True)
 
     lastMicId = None
-    coord = pw.em.Coordinate()
-    coord._topazScore = pw.object.Float()
+    coord = Coordinate()
+    coord._topazScore = Float()
 
     micDict = {}
     # loop to generate a dictionary --> micBaseName : Micrograph
@@ -145,6 +147,7 @@ def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet, scale):
         coordSet.append(coord)
 
     csv.close()
+
 
 def getMicIdName(mic, suffix=''):
     """ Return a name for the micrograph based on its IDs. """

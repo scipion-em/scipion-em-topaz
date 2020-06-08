@@ -8,7 +8,7 @@
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
-# * the Free Software Foundation; either version 2 of the License, or
+# * the Free Software Foundation; either version 3 of the License, or
 # * (at your option) any later version.
 # *
 # * This program is distributed in the hope that it will be useful,
@@ -26,18 +26,19 @@
 # *
 # **************************************************************************
 
-
-
 import pyworkflow as pw
-import pyworkflow.em
+from pyworkflow.tests import BaseTest
+from pyworkflow.plugin import Domain
+from pwem.protocols import ProtImportMicrographs, ProtImportCoordinates
+
 from topaz.protocols import TopazProtTraining
 
 
-XmippProtPreprocessMicrographs = pw.utils.importFromPlugin(
+XmippProtPreprocessMicrographs = Domain.importFromPlugin(
     'xmipp3.protocols', 'XmippProtPreprocessMicrographs', doRaise=True)
 
 
-class TestTopaz(pw.tests.BaseTest):
+class TestTopaz(BaseTest):
     """ Test cryolo protocol"""
 
     @classmethod
@@ -52,13 +53,13 @@ class TestTopaz(pw.tests.BaseTest):
     def runImportMicrograph(self):
 
         """ Run an Import micrograph protocol. """
-        protImport = self.newProtocol(pw.em.ProtImportMicrographs,
-                                         samplingRateMode=0,
-                                         filesPath=self.ds.getFile('micrographs/*.mrc'),
-                                         samplingRate=3.54,
-                                         magnification=59000,
-                                         voltage=300,
-                                         sphericalAberration=2)
+        protImport = self.newProtocol(ProtImportMicrographs,
+                                      samplingRateMode=0,
+                                      filesPath=self.ds.getFile('micrographs/*.mrc'),
+                                      samplingRate=3.54,
+                                      magnification=59000,
+                                      voltage=300,
+                                      sphericalAberration=2)
 
         self.launchProtocol(protImport)
         self.assertSetSize(protImport.outputMicrographs, 20,
@@ -68,7 +69,7 @@ class TestTopaz(pw.tests.BaseTest):
 
     def runMicPreprocessing(self, inputMics):
 
-        print "Preprocessing the micrographs..."
+        print("Preprocessing the micrographs...")
         protPreprocess = self.newProtocol(XmippProtPreprocessMicrographs,
                                           doCrop=True, cropPixels=25)
         self.protPreprocess = protPreprocess
@@ -82,8 +83,8 @@ class TestTopaz(pw.tests.BaseTest):
 
     def runImportCoords(self, inputMics):
         """ Run an Import coords protocol. """
-        protImportCoords = self.newProtocol(pw.em.ProtImportCoordinates,
-                                            importFrom=pw.em.ProtImportCoordinates.IMPORT_FROM_EMAN,
+        protImportCoords = self.newProtocol(ProtImportCoordinates,
+                                            importFrom=ProtImportCoordinates.IMPORT_FROM_EMAN,
                                             objLabel='import EMAN coordinates',
                                             filesPath=self.ds.getFile('pickingEman/info/'),
                                             inputMicrographs=inputMics,
@@ -115,4 +116,3 @@ class TestTopaz(pw.tests.BaseTest):
                                           streamingBatchSize=4)
 
         self.launchProtocol(protTopazTrain)
-

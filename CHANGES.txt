@@ -1,1 +1,6 @@
+3.0.0:
+    - changed version to reflect Scipion 3 support
+    - add topaz 0.2.3 support
+    - func def are now similar to cryolo plugin
+    - add denoise step
 10-July-2019 - First version of streamified protocol
