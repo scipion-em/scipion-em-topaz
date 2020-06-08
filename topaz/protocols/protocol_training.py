@@ -40,7 +40,6 @@ from topaz import convert, Plugin
 from topaz.convert import (CsvMicrographList, CsvCoordinateList,
                            readSetOfCoordinates)
 
-
 TOPAZ_COORDINATES_FILE = 'topaz_coordinates_file'
 PICKING_DENOISE_FOLDER = 'picking_denoise_folder'
 PICKING_PRE_FOLDER = 'picking_pre_folder'
@@ -58,8 +57,7 @@ PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 
 class TopazProtTraining(ProtParticlePickingAuto):
-    """ Train the Topaz parameters for a picking
-    """
+    """ Train the Topaz parameters for a picking """
     _label = 'training'
 
     def __init__(self, **args):
@@ -164,7 +162,8 @@ class TopazProtTraining(ProtParticlePickingAuto):
         form.addParallelSection(threads=1, mpi=1)
 
         self._defineStreamingParams(form)
-	form.getParam('streamingBatchSize').setDefault(32)
+
+        form.getParam('streamingBatchSize').setDefault(32)
 
     # -------------------------- INSERT steps functions -----------------------
     def _insertInitialSteps(self):
@@ -318,7 +317,7 @@ class TopazProtTraining(ProtParticlePickingAuto):
 
         for coord in coordSet.iterItems(orderBy='_micId'):
             micId = coord.getMicId()
-            if micId  in micDict:
+            if micId in micDict:
                 x = int(round(float(coord.getX()) / scale))
                 y = int(round(float(coord.getY()) / scale))
                 csvParts[micDict[micId]].addCoord(micId, x, y)
