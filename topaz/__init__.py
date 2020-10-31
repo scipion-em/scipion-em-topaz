@@ -35,12 +35,14 @@ import pyworkflow as pw
 from .constants import *
 
 
+__version__ = '3.0'
 _references = ['Bepler2018']
 _logo = "topaz_logo.jpeg"
 
 
 class Plugin(pwem.Plugin):
     _supportedVersions = []
+    _url = "https://github.com/scipion-em/scipion-em-topaz"
 
     @classmethod
     def _defineVariables(cls):
