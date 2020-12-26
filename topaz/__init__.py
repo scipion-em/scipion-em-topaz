@@ -35,13 +35,13 @@ import pyworkflow as pw
 from .constants import *
 
 
-__version__ = '3.0'
+__version__ = '3.0.1'
 _references = ['Bepler2018']
 _logo = "topaz_logo.jpeg"
 
 
 class Plugin(pwem.Plugin):
-    _supportedVersions = []
+    _supportedVersions = VERSIONS
     _url = "https://github.com/scipion-em/scipion-em-topaz"
 
     @classmethod
@@ -77,8 +77,9 @@ class Plugin(pwem.Plugin):
 
     @classmethod
     def defineBinaries(cls, env):
-        cls.addTopazPackage(env, TOPAZ_DEFAULT_VER_NUM,
-                            default=bool(cls.getCondaActivationCmd()))
+        for ver in VERSIONS:
+            cls.addTopazPackage(env, ver,
+                                default=ver == TOPAZ_DEFAULT_VER_NUM)
 
     @classmethod
     def addTopazPackage(cls, env, version, default=False):
@@ -88,15 +89,15 @@ class Plugin(pwem.Plugin):
         installationCmd = cls.getCondaActivationCmd()
 
         # Create the environment
-        installationCmd += 'conda create -y -n %s python=3.6;'\
+        installationCmd += 'conda create -y -n %s python=3.6 &&'\
                            % ENV_NAME
 
         # Activate the new environment
-        installationCmd += 'conda activate %s;' % ENV_NAME
+        installationCmd += 'conda activate %s &&' % ENV_NAME
 
         # Install downloaded code
-        installationCmd += 'conda install -y topaz=%s cudatoolkit=9.2 '\
-                           'future -c tbepler -c pytorch;' % version
+        installationCmd += 'conda install -y topaz=%s cudatoolkit '\
+                           '-c tbepler -c pytorch &&' % version
 
         # Flag installation finished
         installationCmd += 'touch %s' % TOPAZ_INSTALLED
