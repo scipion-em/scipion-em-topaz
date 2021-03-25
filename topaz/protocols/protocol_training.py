@@ -60,6 +60,12 @@ class TopazProtTraining(ProtParticlePickingAuto):
     """ Train the Topaz parameters for a picking """
     _label = 'training'
 
+    ADD_MODEL_TRAIN_TYPES = ["New", "PreviousRun"] # "Pretrained",
+    ADD_MODEL_TRAIN_NEW = 0
+    ADD_MODEL_TRAIN_PREVRUN = 1
+    #ADD_MODEL_TRAIN_PRETRAIN = 2
+
+
     def __init__(self, **args):
         ProtParticlePickingAuto.__init__(self, **args)
         self.stepsExecutionMode = cons.STEPS_PARALLEL
@@ -67,12 +73,33 @@ class TopazProtTraining(ProtParticlePickingAuto):
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
         ProtParticlePickingAuto._defineParams(self, form)
-
         form.addParam('inputCoordinates', params.PointerParam,
-                      pointerClass='SetOfCoordinates',
-                      label='Input coordinates', important=True,
-                      help='Select the SetOfCoordinates to be used for '
-                           'training.')
+                    pointerClass='SetOfCoordinates',
+                    label='Input coordinates', important=True,
+                    help='Select the SetOfCoordinates to be used for '
+                         'training.')
+
+        form.addParam('modelInitialization', params.EnumParam,
+                      choices=self.ADD_MODEL_TRAIN_TYPES,
+                      default=self.ADD_MODEL_TRAIN_NEW,
+                      label='Select model type',
+                      help='If you set to *%s*, a new model randomly initialized will be '
+                           'employed. If you set to *%s*, a model trained in a previous run, '
+                           'within this project, will be employed'
+                           % tuple(self.ADD_MODEL_TRAIN_TYPES))
+        # CONTINUE FROM PREVIOUS TRAIN
+
+        form.addParam('continueRun', params.PointerParam,
+                      pointerClass=self.getClassName(),
+                      condition='modelInitialization== %s' % self.ADD_MODEL_TRAIN_PREVRUN, allowsNull=True,
+                      label='Select previous run',
+                      help='Select a previous run to continue from.')
+        form.addParam('skipTraining', params.BooleanParam,
+                      default=False, condition='modelInitialization!= %s ' % self.ADD_MODEL_TRAIN_NEW,
+                      label='Skip training, score directly with pretrained model',
+                      help='If you set to *No*, you should provide training set. If set to *Yes* '
+                           'the coordinates will be directly scored using the pretrained/previous model')
+
         form.addParam('boxSize', params.IntParam, default=100,
                       label='Box size (px)', help='Box size in pixels.')
         form.addParam('micsForTraining', params.IntParam,
@@ -181,15 +208,29 @@ class TopazProtTraining(ProtParticlePickingAuto):
                                          self.scale.get(),
                                          self.preExtra.get())]
 
-        ids += [self._insertFunctionStep('trainingStep',
-                                         self.radius.get(),
-                                         self.autoenc.get(),
-                                         self.numEpochs.get(),
-                                         self.getEnumText('modelFit'),
-                                         self.getEnumText('method'),
-                                         self.numPartPerImg.get(),
-                                         self.trainExtra.get())]
+        if self.modelInitialization.get() == self.ADD_MODEL_TRAIN_PREVRUN and self.skipTraining.get():
+          pwutils.path.copyTree(self.continueRun.get()._getExtraPath('model'), self._getExtraPath('model'))
+
+        else:
+          ids += [self._insertFunctionStep('trainingStep',
+                                           self.radius.get(),
+                                           self.autoenc.get(),
+                                           self.numEpochs.get(),
+                                           self.getNNModelFn(),
+                                           self.getEnumText('method'),
+                                           self.numPartPerImg.get(),
+                                           self.trainExtra.get())]
         return ids
+
+    def getLastEpochModel(self, modelsDir, ext='.sav'):
+      return os.path.join(modelsDir, os.listdir(modelsDir)[-2])
+
+    def getNNModelFn(self):
+      if self.modelInitialization.get() == self.ADD_MODEL_TRAIN_PREVRUN and self.continueRun.get() != None:
+        prevRunModelsDir = self.continueRun.get()._getExtraPath('model')
+        return  self.getLastEpochModel(prevRunModelsDir)
+      else:
+        return self.getEnumText('modelFit')
 
     def _defineFileDict(self):
         """ Centralize how files are called for iterations and references. """
@@ -210,7 +251,7 @@ class TopazProtTraining(ProtParticlePickingAuto):
             TRAININGTEST: os.path.join(trainpreFolder, 'image_list_test.txt'),
             PARTICLES_TRAIN_TXT: os.path.join(trainpreFolder, 'particles_train_test.txt'),
             PARTICLES_TEST_TXT: os.path.join(trainpreFolder, 'particles_test_test.txt'),
-            MODEL_FOLDER: os.path.join(trainpreFolder, "model"),
+            MODEL_FOLDER: self._getExtraPath("model"),
             PICKING_FOLDER: pickingFolder,
             PICKING_DENOISE_FOLDER: pickingDenoiseFolder,
             PICKING_PRE_FOLDER: pickingPreFolder,
