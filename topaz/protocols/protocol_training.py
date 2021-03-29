@@ -27,6 +27,7 @@
 # **************************************************************************
 import os
 import numpy as np
+from shutil import copyfile
 
 import pyworkflow as pw
 import pyworkflow.utils as pwutils
@@ -60,10 +61,10 @@ class TopazProtTraining(ProtParticlePickingAuto):
     """ Train the Topaz parameters for a picking """
     _label = 'training'
 
-    ADD_MODEL_TRAIN_TYPES = ["New", "PreviousRun"] # "Pretrained",
+    ADD_MODEL_TRAIN_TYPES = ["New", "PreviousRun", "Pretrained"]
     ADD_MODEL_TRAIN_NEW = 0
     ADD_MODEL_TRAIN_PREVRUN = 1
-    #ADD_MODEL_TRAIN_PRETRAIN = 2
+    ADD_MODEL_TRAIN_PRETRAIN = 2
 
 
     def __init__(self, **args):
@@ -85,7 +86,8 @@ class TopazProtTraining(ProtParticlePickingAuto):
                       label='Select model type',
                       help='If you set to *%s*, a new model randomly initialized will be '
                            'employed. If you set to *%s*, a model trained in a previous run, '
-                           'within this project, will be employed'
+                           'within this project, will be employed. If you set to *%s* a '
+                           'pretrained model will be used.'
                            % tuple(self.ADD_MODEL_TRAIN_TYPES))
         # CONTINUE FROM PREVIOUS TRAIN
 
@@ -94,11 +96,15 @@ class TopazProtTraining(ProtParticlePickingAuto):
                       condition='modelInitialization== %s' % self.ADD_MODEL_TRAIN_PREVRUN, allowsNull=True,
                       label='Select previous run',
                       help='Select a previous run to continue from.')
+        form.addParam('pretrainedModel', params.FileParam,
+                      condition='modelInitialization== %s' % self.ADD_MODEL_TRAIN_PRETRAIN,
+                      label='Topaz model file', help='A topaz NN model pretrained and stored in a .sav file')
         form.addParam('skipTraining', params.BooleanParam,
                       default=False, condition='modelInitialization!= %s ' % self.ADD_MODEL_TRAIN_NEW,
                       label='Skip training, score directly with pretrained model',
-                      help='If you set to *No*, you should provide training set. If set to *Yes* '
-                           'the coordinates will be directly scored using the pretrained/previous model')
+                      help='If you set to *No*, a topaz model will be trained. This model can be trained from'
+                           'scratch (new) or retrain an existing model. If you set *Yes*, the existing pretrained'
+                           'model will be used for making the predictions')
 
         form.addParam('boxSize', params.IntParam, default=100,
                       label='Box size (px)', help='Box size in pixels.')
@@ -209,9 +215,15 @@ class TopazProtTraining(ProtParticlePickingAuto):
                                          self.preExtra.get())]
 
         if self.modelInitialization.get() == self.ADD_MODEL_TRAIN_PREVRUN and self.skipTraining.get():
+          #Copying model(s) and statistics from previous run and skip training
           pwutils.path.copyTree(self.continueRun.get()._getExtraPath('model'), self._getExtraPath('model'))
-
+          
+        elif self.modelInitialization.get() == self.ADD_MODEL_TRAIN_PRETRAIN and self.skipTraining.get():
+          #Copying model from selected path and skip training
+          os.mkdir(self._getExtraPath('model'))
+          copyfile(self.getNNModelFn(), self._getExtraPath('model/model.sav'))
         else:
+          #Training selected
           ids += [self._insertFunctionStep('trainingStep',
                                            self.radius.get(),
                                            self.autoenc.get(),
@@ -223,12 +235,20 @@ class TopazProtTraining(ProtParticlePickingAuto):
         return ids
 
     def getLastEpochModel(self, modelsDir, ext='.sav'):
-      return os.path.join(modelsDir, os.listdir(modelsDir)[-2])
+      '''Return the last trained model, in alphabetic order (last trained epoch) in modelsDir'''
+      modelFn = 'model.sav'
+      for file in os.listdir(modelsDir):
+        if ext in file:
+          modelFn = file
+      return os.path.join(modelsDir, modelFn)
 
     def getNNModelFn(self):
+      '''Returns the model fn (or type) as expected from topaz software'''
       if self.modelInitialization.get() == self.ADD_MODEL_TRAIN_PREVRUN and self.continueRun.get() != None:
         prevRunModelsDir = self.continueRun.get()._getExtraPath('model')
         return  self.getLastEpochModel(prevRunModelsDir)
+      elif self.modelInitialization.get() == self.ADD_MODEL_TRAIN_PRETRAIN and '.sav' in self.pretrainedModel.get():
+        return self.pretrainedModel.get()
       else:
         return self.getEnumText('modelFit')
 
@@ -451,10 +471,15 @@ class TopazProtTraining(ProtParticlePickingAuto):
         numEpochs = self.numEpochs.get()
         modelDir = self._getFileName(MODEL_FOLDER)
 
+        if self.skipTraining.get():
+          modelFn = self.getLastEpochModel(self._getExtraPath('model'))
+        else:
+          modelFn = '%s/model_epoch%d.sav' % (modelDir, numEpochs)
+
         # Launch process called extract which is rather a prediction
         extractRadius = (boxSize / 2) / self.scale.get()
         args = ' -r %d' % extractRadius
-        args += ' -m %s/model_epoch%d.sav' % (modelDir, numEpochs)
+        args += ' -m %s' % modelFn
         args += ' -o %s' % self.getPickingFileName(micList,
                                                    TOPAZ_COORDINATES_FILE)
         args += ' --num-workers %d' % self.numberOfThreads
