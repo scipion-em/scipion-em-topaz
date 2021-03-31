@@ -57,9 +57,9 @@ PARTICLES_TEST_TXT = 'particles_test.txt'
 PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 
-class TopazProtTraining(ProtParticlePickingAuto):
-    """ Train the Topaz parameters for a picking """
-    _label = 'training'
+class TopazProtComplete(ProtParticlePickingAuto):
+    """ Train the Topaz parameters and perform a picking """
+    _label = 'topaz complete'
 
     ADD_MODEL_TRAIN_TYPES = ["New", "PreviousRun", "Pretrained"]
     ADD_MODEL_TRAIN_NEW = 0

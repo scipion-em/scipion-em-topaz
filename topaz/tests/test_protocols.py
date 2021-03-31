@@ -31,7 +31,7 @@ from pyworkflow.tests import BaseTest
 from pyworkflow.plugin import Domain
 from pwem.protocols import ProtImportMicrographs, ProtImportCoordinates
 
-from topaz.protocols import TopazProtTraining
+from topaz.protocols import TopazProtComplete
 
 
 XmippProtPreprocessMicrographs = Domain.importFromPlugin(
@@ -101,7 +101,7 @@ class TestTopaz(BaseTest):
         protPrep = self.runMicPreprocessing(protImportMics.outputMicrographs)
         protImportCoords = self.runImportCoords(protPrep.outputMicrographs)
         inputCoords = protImportCoords.outputCoordinates
-        protTopazTrain = self.newProtocol(TopazProtTraining,
+        protTopazTrain = self.newProtocol(TopazProtComplete,
                                           objLabel='topaz - training',
                                           inputMicrographs=self.protPreprocess.outputMicrographs,
                                           micsForTraining=10,

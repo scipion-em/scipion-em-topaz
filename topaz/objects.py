@@ -1,10 +1,8 @@
 # **************************************************************************
 # *
 # * Authors:     J.M. De la Rosa Trevin (delarosatrevin@scilifelab.se) [1]
-# *              Peter Horvath (phorvath@cnb.csic.es) [2]
 # *
 # * [1] SciLifeLab, Stockholm University
-# * [2] I2PC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -26,8 +24,21 @@
 # *
 # **************************************************************************
 
-from .protocol_topaz_complete import TopazProtComplete
-from .protocol_topaz_training import TopazProtTraining
-from .protocol_topaz_picking import TopazProtPicking
-from .protocol_topaz_import import TopazProtImport
+import pyworkflow.object as pwobj
+from pwem import EMObject
 
+
+class TopazModel(EMObject):
+    """ Simple class to store the Topaz training model path. """
+    def __init__(self, path=None, **kwargs):
+        EMObject.__init__(self, **kwargs)
+        self._path = pwobj.String(path)
+
+    def getPath(self):
+        return self._path.get()
+
+    def setPath(self, path):
+        self._path.set(path)
+
+    def __str__(self):
+        return "TopazModel(path=%s)" % self.getPath()
