@@ -26,7 +26,6 @@
 # *
 # **************************************************************************
 
-from .protocol_topaz_complete import TopazProtComplete
 from .protocol_topaz_training import TopazProtTraining
 from .protocol_topaz_picking import TopazProtPicking
 from .protocol_topaz_import import TopazProtImport

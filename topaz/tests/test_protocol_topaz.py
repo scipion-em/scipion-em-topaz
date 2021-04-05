@@ -35,7 +35,7 @@ import topaz.protocols as protocols
 XmippProtPreprocessMicrographs = Domain.importFromPlugin(
     'xmipp3.protocols', 'XmippProtPreprocessMicrographs', doRaise=True)
 
-class TestTopazSeparated(BaseTest):
+class TestTopaz(BaseTest):
     """ Test Topaz protocol"""
     @classmethod
     def setData(cls):
@@ -56,7 +56,7 @@ class TestTopazSeparated(BaseTest):
         protImport = cls.newProtocol(
             ProtImportMicrographs,
             samplingRateMode=0,
-            filesPath=TestTopazSeparated.ds.getFile('micrographs/*.mrc'),
+            filesPath=TestTopaz.ds.getFile('micrographs/*.mrc'),
             samplingRate=3.54,
             magnification=59000,
             voltage=300,
@@ -83,7 +83,7 @@ class TestTopazSeparated(BaseTest):
             ProtImportCoordinates,
             importFrom=ProtImportCoordinates.IMPORT_FROM_EMAN,
             objLabel='import EMAN coordinates',
-            filesPath=TestTopazSeparated.ds.getFile('pickingEman/info/'),
+            filesPath=TestTopaz.ds.getFile('pickingEman/info/'),
             inputMicrographs=cls.protPreprocess.outputMicrographs,
             filesPattern='*.json',
             boxSize=65)

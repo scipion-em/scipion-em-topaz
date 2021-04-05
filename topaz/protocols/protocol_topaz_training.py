@@ -270,7 +270,7 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
       baseFn = pw.utils.removeBaseExt(micFn)
       inputFn = self._getFileName(TRAINING_MIC, **{"mic": baseFn})
       if micFn.endswith('.mrc'):
-        pwutils.createLink(micFn, inputFn)
+        pwutils.createAbsLink(os.path.abspath(micFn), inputFn)
       else:
         ih.convert(micFn, inputFn)
 

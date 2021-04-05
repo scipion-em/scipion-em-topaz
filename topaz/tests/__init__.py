@@ -1,1 +1,1 @@
-from .test_protocols import TestTopaz
+from .test_protocol_topaz import TestTopaz
