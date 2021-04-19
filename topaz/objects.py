@@ -1,10 +1,8 @@
 # **************************************************************************
 # *
 # * Authors:     J.M. De la Rosa Trevin (delarosatrevin@scilifelab.se) [1]
-# *              Peter Horvath (phorvath@cnb.csic.es) [2]
 # *
 # * [1] SciLifeLab, Stockholm University
-# * [2] I2PC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -26,18 +24,21 @@
 # *
 # **************************************************************************
 
+import pyworkflow.object as pwobj
+from pwem import EMObject
 
-def getTopazEnvName(version):
-    return "topaz-%s" % version
 
-V0_2_4 = "0.2.4"
-V0_2_3 = "0.2.3"
-VERSIONS = [V0_2_3, V0_2_4]
-TOPAZ_DEFAULT_VER_NUM = V0_2_4
+class TopazModel(EMObject):
+    """ Simple class to store the Topaz training model path. """
+    def __init__(self, path=None, **kwargs):
+        EMObject.__init__(self, **kwargs)
+        self._path = pwobj.String(path)
 
-DEFAULT_ENV_NAME = getTopazEnvName(TOPAZ_DEFAULT_VER_NUM)
-DEFAULT_ACTIVATION_CMD = 'conda activate ' + DEFAULT_ENV_NAME
-TOPAZ_ENV_ACTIVATION = 'TOPAZ_ENV_ACTIVATION'
+    def getPath(self):
+        return self._path.get()
 
-# Topaz supported input formats for micrographs
-TOPAZ_SUPPORTED_FORMATS = [".mrc", ".tiff", ".png"]
+    def setPath(self, path):
+        self._path.set(path)
+
+    def __str__(self):
+        return "TopazModel(path=%s)" % self.getPath()
