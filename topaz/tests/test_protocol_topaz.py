@@ -90,7 +90,7 @@ class TestTopaz(BaseTest):
         cls.launchProtocol(protImportCoords)
         cls.protImportCoords = protImportCoords
 
-    def _runTraining(self, modelInit=0, prevModel=None):
+    def _runTraining(self, modelInit=0, prevModel=None, denoise=False):
         self.runImportCoords()
         # Topaz training
         protTraining = self.newProtocol(
@@ -100,7 +100,7 @@ class TestTopaz(BaseTest):
             inputCoordinates=self.protImportCoords.outputCoordinates,
             modelInitialization=modelInit,
             prevTopazModel=prevModel,
-            radius=3, scale=4,
+            radius=3, scale=4, doDenoise=denoise,
             numEpochs=1)
         self.launchProtocol(protTraining)
 
@@ -113,7 +113,7 @@ class TestTopaz(BaseTest):
             label="Picking after Training 1",
             inputMicrographs=self.protPreprocess.outputMicrographs,
             prevTopazModel=protTraining.outputModel,
-            boxSize=50,
+            boxSize=50, doDenoise=denoise,
             streamingBatchSize=10)
 
         self.launchProtocol(protPicking)
@@ -141,7 +141,7 @@ class TestTopaz(BaseTest):
 
     def testTraining(self):
         #Training a new model and picking
-        protTrained, protPicked = self._runTraining()
+        protTrained, protPicked = self._runTraining(denoise=True)
         #Importing a model from path
         protImported = self._runImportModel(protTrained)
         #Training an imported model and picking
