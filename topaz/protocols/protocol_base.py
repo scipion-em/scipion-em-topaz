@@ -46,11 +46,12 @@ class ProtTopazBase(EMProtocol):
                    choices=['unet', 'unet-small', 'fcnn', 'affineresnet8'],
                    label='Model',
                    help='Denoising model to use on micrographs.')
-    group.addParam('patchSize', params.IntParam, default=2048,
+    group.addParam('patchSize', params.IntParam, default=-1,
                    label='Patch Size', condition='doDenoise',
                    help='Process each micrograph in patches of this size.\n'
                         'This is useful when using GPU processing and the micrographs '
-                        'are too large to be denoised in one shot on your GPU')
+                        'are too large to be denoised in one shot on your GPU. '
+                        'By default (<0), it is not used')
     group.addParam('denoiseExtra', params.StringParam, default='',
                    expertLevel=cons.LEVEL_ADVANCED, condition='doDenoise',
                    label="Advanced options",
@@ -80,7 +81,8 @@ class ProtTopazBase(EMProtocol):
       args = ' %s/*.mrc -o %s/' % (inputDir, outDir)
       args += ' --model %s' % self.getEnumText('modelDenoise')
       args += ' --device %s' % self.gpuList
-      args += ' --patch-size %s' % self.patchSize.get()
+      if self.patchSize.get() > 0:
+        args += ' --patch-size %s' % self.patchSize.get()
 
       if self.denoiseExtra.hasValue():
         args += ' ' + self.denoiseExtra.get()
