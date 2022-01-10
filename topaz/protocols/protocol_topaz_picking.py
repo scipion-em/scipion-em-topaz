@@ -23,6 +23,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+
 import os
 import time
 
@@ -40,6 +41,7 @@ PICKING_DENOISE_FOLDER = 'picking_denoise_folder'
 PICKING_PRE_FOLDER = 'picking_pre_folder'
 PICKING_FOLDER = 'picking_folder'
 MODEL_FOLDER = 'model_folder'
+
 
 class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
   """ Perform a picking using a topaz model """
