@@ -165,7 +165,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     args += ' -o %s' % self.getPickingFileName(micList,
                                                TOPAZ_COORDINATES_FILE)
     args += ' --num-workers %d' % self.numberOfThreads
-    args += ' --device %s' % self.gpuList
+    args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
     args += ' %s/*.mrc' % preprocessedDir
 
     Plugin.runTopaz(self, 'topaz extract', args)
@@ -195,6 +195,6 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
   def _validate(self):
     validateMsgs = []
     if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
-      if self.prevTopazModel.get() == None:
+      if self.prevTopazModel.get() is None:
         validateMsgs.append('Model not ready')
     return validateMsgs
