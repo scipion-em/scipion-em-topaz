@@ -109,6 +109,7 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
     form.addSection('Train')
     form.addParam('radius', params.IntParam, default=3,
                   label='Particle radius (px)',
+                  allowsPointers=True,
                   help='Pixel radius around particle centers to '
                        'consider.')
     form.addParam('autoenc', params.FloatParam, default=0.,
@@ -125,6 +126,7 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
                   help='Objective function to use for learning the '
                        'region classifier.')
     form.addParam('numPartPerImg', params.IntParam, default=300,
+                  allowsPointers=True,
                   expertLevel=cons.LEVEL_ADVANCED,
                   label='Number of particles per image',
                   help='Expected number of particles per micrograph.')
