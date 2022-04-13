@@ -88,6 +88,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     form.addSection('Picking')
     form.addParam('radius', params.IntParam, default=8,
                   label='Particle radius (px)',
+                  allowsPointers=True,
                   help='Pixel radius around particle centers to consider.')
     form.addParam('boxSize', params.IntParam, default=-1, expertLevel=cons.LEVEL_ADVANCED, allowsPointers=True,
                   label='Box size (px)', help='Box size in pixels. By default(-1): radius*2*scale')
