@@ -1,3 +1,5 @@
+3.0.2:
+    - add topaz 0.2.5 support
 3.0.1:
     - add topaz 0.2.4 support
     - protocols separated in import, training and picking
