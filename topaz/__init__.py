@@ -95,7 +95,8 @@ class Plugin(pwem.Plugin):
         # Activate the new environment
         installationCmd += 'conda activate %s &&' % ENV_NAME
 
-        cudaVersion = cls.getVersionFromPath(pwem.Config.CUDA_LIB, pattern="cuda")
+        cudaVersion = cls.getVersionFromPath(pwem.Config.CUDA_LIB, pattern="cuda",
+                                             default="11.6")
 
         toolkitVersion = "10.2" if cudaVersion.major == 10 else "11.3"
         # Install downloaded code
