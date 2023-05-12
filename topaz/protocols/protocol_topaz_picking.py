@@ -23,6 +23,7 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
+
 import os
 import time
 
@@ -40,6 +41,7 @@ PICKING_DENOISE_FOLDER = 'picking_denoise_folder'
 PICKING_PRE_FOLDER = 'picking_pre_folder'
 PICKING_FOLDER = 'picking_folder'
 MODEL_FOLDER = 'model_folder'
+
 
 class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
   """ Perform a picking using a topaz model """
@@ -86,8 +88,9 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     form.addSection('Picking')
     form.addParam('radius', params.IntParam, default=8,
                   label='Particle radius (px)',
+                  allowsPointers=True,
                   help='Pixel radius around particle centers to consider.')
-    form.addParam('boxSize', params.IntParam, default=-1, expertLevel=cons.LEVEL_ADVANCED,
+    form.addParam('boxSize', params.IntParam, default=-1, expertLevel=cons.LEVEL_ADVANCED, allowsPointers=True,
                   label='Box size (px)', help='Box size in pixels. By default(-1): radius*2*scale')
     form.addParam('threshold', params.FloatParam, default=-6.0,
                   label='Extraction threshold',
@@ -163,7 +166,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     args += ' -o %s' % self.getPickingFileName(micList,
                                                TOPAZ_COORDINATES_FILE)
     args += ' --num-workers %d' % self.numberOfThreads
-    args += ' --device %s' % self.gpuList
+    args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
     args += ' %s/*.mrc' % preprocessedDir
 
     Plugin.runTopaz(self, 'topaz extract', args)
@@ -193,6 +196,6 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
   def _validate(self):
     validateMsgs = []
     if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
-      if self.prevTopazModel.get() == None:
+      if self.prevTopazModel.get() is None:
         validateMsgs.append('Model not ready')
     return validateMsgs
