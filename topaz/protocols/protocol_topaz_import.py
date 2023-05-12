@@ -36,9 +36,9 @@ from topaz.objects import TopazModel
 class TopazProtImport(ProtImport):
     """ Protocol to import an existing topaz training model.
     The model will be registered as an output of this protocol and
-    it can be used later for further training or for picking.
+    can be used later for further training or for picking.
     """
-    _label = 'topaz import'
+    _label = 'import training model'
 
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
