@@ -56,7 +56,7 @@ PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
   """ Train and save a Topaz model"""
-  _label = 'topaz training'
+  _label = 'training'
 
   ADD_MODEL_TRAIN_TYPES = ["New", "TopazModel"]
   ADD_MODEL_TRAIN_NEW = 0

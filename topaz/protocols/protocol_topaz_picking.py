@@ -45,7 +45,7 @@ MODEL_FOLDER = 'model_folder'
 
 class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
   """ Perform a picking using a topaz model """
-  _label = 'topaz picking'
+  _label = 'picking'
 
   ADD_MODEL_TRAIN_TYPES = ["TopazTrained", "TopazGeneral"]
   ADD_MODEL_PRETRAINED = 0

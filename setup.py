@@ -77,29 +77,29 @@ setup(
     #
     # For a list of valid classifiers, see
     # https://pypi.python.org/pypi?%3Aaction=list_classifiers
-    #classifiers=[  # Optional
+    classifiers=[  # Optional
         # How mature is this project? Common values are
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-    #   'Development Status :: 3 - Alpha',
+        'Development Status :: 5 - Production/Stable',
 
         # Indicate who your project is intended for
-    #   'Intended Audience :: Users',
+        #   'Intended Audience :: Users',
 
-    # Pick your license as you wish
-    #   'License :: OSI Approved :: MIT License',
+        # Pick your license as you wish
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
 
-    # Specify the Python versions you support here. In particular, ensure
-    # that you indicate whether you support Python 2, Python 3 or both.
-    #   'Programming Language :: Python :: 2.7'
-    #],
+        # Specify the Python versions you support here. In particular, ensure
+        # that you indicate whether you support Python 2, Python 3 or both.
+        'Programming Language :: Python :: 3'
+    ],
 
     # This field adds keywords for your project which will appear on the
     # project page. What does your project relate to?
     #
     # Note that this is a string of words separated by whitespace, not a list.
-    keywords='scipion cryoem imageprocessing scipion-3.0',  # Optional
+    keywords='scipion cryo-em image-processing scipion-3.0',  # Optional
 
     # You can just specify package directories manually here if your project is
     # simple. Or you can use find_packages().
@@ -149,6 +149,11 @@ setup(
     #
     # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
     #data_files=[('my_data', ['data/data_file'])],  # Optional
+
+    project_urls={  # Optional
+        'Bug Reports': 'https://github.com/scipion-em/scipion-em-topaz/issues',
+        'Source': 'https://github.com/scipion-em/scipion-em-topaz/',
+    },
 
     # To provide executable scripts, use entry points in preference to the
     # "scripts" keyword. Entry points provide cross-platform support and allow

@@ -1,5 +1,11 @@
 # Include the README
 include *.rst
-include *.txt
+
 # Include the license file
 include LICENSE
+
+# Include the changelog
+include CHANGES.txt
+
+# Include conf file
+include topaz/protocols.conf
