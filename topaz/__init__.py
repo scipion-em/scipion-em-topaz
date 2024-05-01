@@ -54,6 +54,9 @@ class Plugin(pwem.Plugin):
         activation = cls.getVar(TOPAZ_ENV_ACTIVATION)
         scipionHome = pw.Config.SCIPION_HOME + os.path.sep
 
+        # JMRT: Why we need to do this?
+        # In the case Scipion is installed with conda, and the same conda is used
+        # for other programs, it will break the activation command
         return activation.replace(scipionHome, "", 1)
 
     @classmethod
@@ -121,6 +124,7 @@ class Plugin(pwem.Plugin):
     @classmethod
     def runTopaz(cls, protocol, program, args, cwd=None):
         """ Run Topaz command from a given protocol. """
-        fullProgram = '%s %s && %s' % (cls.getCondaActivationCmd(),
-                                       cls.getTopazEnvActivation(), program)
+        envAct = cls.getTopazEnvActivation()
+        condaAct = cls.getCondaActivationCmd() if envAct.startswith('conda activate') else ''
+        fullProgram = f'{condaAct} {envAct} && {program}'
         protocol.runJob(fullProgram, args, env=cls.getEnviron(), cwd=cwd)
