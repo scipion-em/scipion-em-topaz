@@ -100,7 +100,7 @@ class Plugin(pwem.Plugin):
 
         toolkitVersion = "10.2" if cudaVersion.major == 10 else "11.3"
         # Install downloaded code
-        installationCmd += 'conda install -y topaz=%s cudatoolkit=%s '\
+        installationCmd += 'conda install -y mkl==2024.0 topaz=%s cudatoolkit=%s '\
                            '-c tbepler -c pytorch &&' % (version, toolkitVersion)
 
         # Flag installation finished
