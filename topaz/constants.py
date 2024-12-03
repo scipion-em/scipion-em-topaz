@@ -30,12 +30,9 @@
 def getTopazEnvName(version):
     return "topaz-%s" % version
 
-V0_2_5 = "0.2.5"
-V0_2_4 = "0.2.4"
-V0_2_3 = "0.2.3"
 V0_3_0 = "0.3.0"
 V0_3_1 = "0.3.1"
-VERSIONS = [V0_2_3, V0_2_4, V0_2_5, V0_3_0, V0_3_1]
+VERSIONS = [V0_3_0, V0_3_1]
 TOPAZ_DEFAULT_VER_NUM = V0_3_1
 
 DEFAULT_ENV_NAME = getTopazEnvName(TOPAZ_DEFAULT_VER_NUM)
