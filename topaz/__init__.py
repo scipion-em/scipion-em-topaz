@@ -35,7 +35,7 @@ import pyworkflow as pw
 from .constants import *
 
 
-__version__ = '3.0.2'
+__version__ = '3.0.3'
 _references = ['Bepler2018']
 _logo = "topaz_logo.jpeg"
 
@@ -89,19 +89,19 @@ class Plugin(pwem.Plugin):
         installationCmd = cls.getCondaActivationCmd()
 
         # Create the environment
-        installationCmd += 'conda create -y -n %s python=3.6 &&'\
+        installationCmd += 'conda create -y -n %s python=3.11 &&'\
                            % ENV_NAME
 
         # Activate the new environment
         installationCmd += 'conda activate %s &&' % ENV_NAME
 
         cudaVersion = cls.getVersionFromPath(pwem.Config.CUDA_LIB, pattern="cuda",
-                                             default="11.6")
+                                             default="11.8")
 
-        toolkitVersion = "10.2" if cudaVersion.major == 10 else "11.3"
+        toolkitVersion = "10.2" if cudaVersion.major == 10 else "11.8"
         # Install downloaded code
-        installationCmd += 'conda install -y mkl==2024.0 topaz=%s cudatoolkit=%s '\
-                           '-c tbepler -c pytorch &&' % (version, toolkitVersion)
+        installationCmd += 'conda install -y tqdm h5py fsspec sympy=1.13.1 topaz=%s cudatoolkit=%s pytorch torchvision pytorch-cuda=%s '\
+                           '-c tbepler -c pytorch -c nvidia &&' % (version, toolkitVersion, toolkitVersion)
 
         # Flag installation finished
         installationCmd += 'touch %s' % TOPAZ_INSTALLED
