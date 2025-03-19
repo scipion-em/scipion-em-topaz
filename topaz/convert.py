@@ -83,8 +83,11 @@ class CsvCoordinateList(CsvImageList):
         CsvImageList.__init__(self, filename, mode, columns=columns)
 
     def addCoord(self, micId, x, y):
-        self._addRow('%06d' % micId, x, y)
+        self._addRow(micId2MicName(micId), x, y)
 
+
+def micId2MicName(micId):
+    return '%06d' % micId
 
 def convertMicrographs(micList, micDir):
     """ Convert (or simply link) input micrographs into the given directory
