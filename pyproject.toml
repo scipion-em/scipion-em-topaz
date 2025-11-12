@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scipion-em-topaz"
+dynamic = ["version"]
+
+dependencies = [
+    "scipion-em"
+]
+
+authors = [
+    {name = "Scipion Madrid", email = "scipion@cnb.csic.es"}
+]
+description = "Plugin to use Topaz within the Scipion framework"
+readme = "README.rst"
+requires-python = ">=3.8"
+keywords = ["scipion", "electron-microscopy", "cryo-em", "structural-biology", "image-processing", "scipion-3.0"]
+license = {text = "GNU General Public License v3 (GPLv3)"}
+
+[project.urls]
+Homepage = "https://github.com/scipion-em/scipion-em-topaz"
+Repository = "https://github.com/scipion-em/scipion-em-topaz"
+Issues = "https://github.com/scipion-em/scipion-em-topaz/issues"
+
+[tool.setuptools.package-data]
+"topaz" = ["protocols.conf", "topaz_logo.png"]
+
+[project.entry-points."pyworkflow.plugin"]
+topaz = "topaz"
+
+[tool.setuptools.dynamic]
+version = {attr = "topaz.__version__"}

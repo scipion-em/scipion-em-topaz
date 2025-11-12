@@ -33,8 +33,9 @@ def getTopazEnvName(version):
 V0_2_5 = "0.2.5"
 V0_2_4 = "0.2.4"
 V0_2_3 = "0.2.3"
-VERSIONS = [V0_2_3, V0_2_4, V0_2_5]
-TOPAZ_DEFAULT_VER_NUM = V0_2_5
+V0_3_7 = "0.3.7"
+VERSIONS = [V0_2_3, V0_2_4, V0_2_5, V0_3_7]
+TOPAZ_DEFAULT_VER_NUM = V0_3_7
 
 DEFAULT_ENV_NAME = getTopazEnvName(TOPAZ_DEFAULT_VER_NUM)
 DEFAULT_ACTIVATION_CMD = 'conda activate ' + DEFAULT_ENV_NAME

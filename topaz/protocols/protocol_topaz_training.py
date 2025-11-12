@@ -38,7 +38,7 @@ from pwem.emlib.image import ImageHandler
 
 from topaz.protocols.protocol_base import ProtTopazBase
 from topaz import convert, Plugin
-from topaz.convert import (CsvMicrographList, CsvCoordinateList)
+from topaz.convert import (CsvMicrographList, CsvCoordinateList, micId2MicName)
 from topaz.objects import TopazModel
 
 
@@ -224,7 +224,7 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
         break
       else:
         if coordSet.isStreamClosed():
-          raise Exception("We have a problem!!")
+          raise Exception("Input coordinates set is closed and there is not enough data to do the training!!.")
         self.info("Not yet there: %s" % len(micIds))
         import time
         time.sleep(10)
@@ -269,7 +269,7 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
     for i, micId in zip(indexes, micIds):
       mic = coordMics[micId]
       micFn = mic.getFileName()
-      baseFn = pw.utils.removeBaseExt(micFn)
+      baseFn = micId2MicName(micId)
       inputFn = self._getFileName(TRAINING_MIC, **{"mic": baseFn})
       if micFn.endswith('.mrc'):
         pwutils.createAbsLink(os.path.abspath(micFn), inputFn)
