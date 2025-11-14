@@ -89,19 +89,19 @@ class Plugin(pwem.Plugin):
         installationCmd = cls.getCondaActivationCmd()
 
         # Create the environment
-        installationCmd += 'conda create -y -n %s python=3.10 &&'\
+        installationCmd += 'conda create -y -n %s python=3.10 && '\
                            % ENV_NAME
 
         # Activate the new environment
-        installationCmd += 'conda activate %s &&' % ENV_NAME
+        installationCmd += 'conda activate %s && ' % ENV_NAME
 
         cudaVersion = cls.getVersionFromPath(pwem.Config.CUDA_LIB, pattern="cuda",
                                              default="11.6")
 
-        # toolkitVersion = "10.2" if cudaVersion.major == 10 else "11.3"
         # Install downloaded code
-        installationCmd += 'conda install -y topaz=%s fsspec pytorch-cuda=%s '\
-                           '-c tbepler -c  pytorch -c nvidia&&' % (version, cudaVersion)
+        installationCmd += 'pip install torch torchvision --index-url https://download.pytorch.org/whl/%s && ' \
+            % (str(cudaVersion).replace('.',''))
+        installationCmd += 'conda install -y topaz=%s && ' % (version)
 
         # Flag installation finished
         installationCmd += 'touch %s' % TOPAZ_INSTALLED
