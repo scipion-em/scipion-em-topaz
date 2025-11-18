@@ -89,7 +89,7 @@ class Plugin(pwem.Plugin):
         installationCmd = cls.getCondaActivationCmd()
 
         # Create the environment
-        installationCmd += 'conda create -y -n %s python=3.10 && '\
+        installationCmd += ' conda create -y -n %s python=3.10 && '\
                            % ENV_NAME
 
         # Activate the new environment
@@ -99,7 +99,7 @@ class Plugin(pwem.Plugin):
                                              default="11.6")
 
         # Install downloaded code
-        installationCmd += 'pip install torch torchvision --index-url https://download.pytorch.org/whl/%s && ' \
+        installationCmd += 'pip install torch==2.9.0 torchvision==0.24.0 --index-url https://download.pytorch.org/whl/%s && ' \
             % (str(cudaVersion).replace('.',''))
         installationCmd += 'conda install -y topaz=%s && ' % (version)
 
