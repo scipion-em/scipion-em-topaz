@@ -125,12 +125,42 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     self._updateFilenamesDict(myDict)
 
   # --------------------------- STEPS functions ------------------------------
+  def makeSubsets(self, iterable, n):
+      """
+      Divide iterable into n subsets preserving order.
+
+      Args:
+          iterable: The input sequence
+          n: Number of subsets
+
+      Returns:
+          List of n subsets
+      """
+      lst = list(iterable)
+      size = len(lst)
+
+      # Calculate base size and remainder
+      base_size = size // n
+      remainder = size % n
+
+      subsets = []
+      start = 0
+
+      for i in range(n):
+          # First 'remainder' subsets get one extra element
+          subset_size = base_size + (1 if i < remainder else 0)
+          subsets.append(lst[start:start + subset_size])
+          start += subset_size
+
+      return subsets
+
   def _pickMicrograph(self, micrograph, *args):
     """Picking the given micrograph. """
     self._pickMicrographList([micrograph], *args)
 
   def _pickMicrographList(self, micList, *args):
     # Link or convert the whole set of micrographs to "batch" folders
+    gpuId = args[0]
     workingDir = self.getPickingFileName(micList, PICKING_FOLDER)
     pwutils.makePath(workingDir)
 
@@ -140,7 +170,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
       denoisedDir = self.getPickingFileName(micList, PICKING_DENOISE_FOLDER)
       pwutils.makePath(denoisedDir)
       # denoise the micrographs in the batch folder, output in denoisedDir
-      args = self.getDenoiseArgs(workingDir, denoisedDir)
+      args = self.getDenoiseArgs(workingDir, denoisedDir, gpuId)
       Plugin.runTopaz(self, 'topaz denoise', args)
       workingDir = denoisedDir
 
@@ -150,7 +180,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     pwutils.makePath(preprocessedDir)
 
     # preprocess the micrographs in the batch folder, output in preprocessedDir
-    args = self.getPreprocessArgs(workingDir, preprocessedDir)
+    args = self.getPreprocessArgs(workingDir, preprocessedDir, gpuId)
     Plugin.runTopaz(self, 'topaz preprocess', args)
 
     # perform prediction on the preprocessed micrographs
@@ -166,26 +196,28 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     args += ' -o %s' % self.getPickingFileName(micList,
                                                TOPAZ_COORDINATES_FILE)
     args += ' --num-workers %d' % self.numberOfThreads
-    args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
+    args += f' --device {gpuId}'  # Add GPU that will be set by the executor
     args += ' %s/*.mrc' % preprocessedDir
 
     Plugin.runTopaz(self, 'topaz extract', args)
 
   def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
     """ Read the coordinates from a given list of micrographs """
+    gpuList = self.getGpuList()
+    micNameSubSets = self.makeSubsets(micDoneList, len(gpuList))
+    for micNameSubset in micNameSubSets:
+        outputParticlesFn = self.getPickingFileName(micNameSubset,
+                                                    TOPAZ_COORDINATES_FILE)
 
-    outputParticlesFn = self.getPickingFileName(micDoneList,
-                                                TOPAZ_COORDINATES_FILE)
+        scale = self.scale.get()
+        readSetOfCoordinates(outputParticlesFn, outputCoords.getMicrographs(),
+                             outputCoords, scale)
 
-    scale = self.scale.get()
-    readSetOfCoordinates(outputParticlesFn, outputCoords.getMicrographs(),
-                         outputCoords, scale)
-
-    if self.boxSize.get() == -1:
-      boxSize = self.radius.get() * 2 * scale
-    else:
-      boxSize = self.boxSize.get()
-    outputCoords.setBoxSize(boxSize)
+        if self.boxSize.get() == -1:
+          boxSize = self.radius.get() * 2 * scale
+        else:
+          boxSize = self.boxSize.get()
+        outputCoords.setBoxSize(boxSize)
 
   # --------------------------- UTILS functions --------------------------
   def getPickingFileName(self, micList, key):
@@ -199,3 +231,78 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
       if self.prevTopazModel.get() is None:
         validateMsgs.append('Model not ready')
     return validateMsgs
+
+  # ----------------- STEPS control functions -------------
+  def _insertNewMics(self, inputMics, getMicKeyFunc,
+                     insertStepFunc, insertStepListFunc, *args):
+      """ Insert steps of new micrographs taking into account the batch size.
+      It is assumed that a self.micDict exists mapping between micKey and mic.
+      It is also assumed that self.streamClosed is defined...with True value
+      if the input stream is closed.
+      This function can be used from several base protocols that support
+      streaming and batch:
+
+      - ProtCTFMicrographs
+      - ProtParticlePickingAuto
+      - ProtExtractParticles
+      Params:
+          inputMics: the input micrographs to be inserted into steps
+          getMicKeyFunc: function to get the key of a micrograph
+              (usually mic.getMicName()
+          insertStepFunc: function used to insert a single step
+          insertStepListFunc: function used to insert many steps.
+          *args: argument list to be passed to step functions
+      Returns:
+          The list of step Ids that can be used as dependencies.
+      """
+      deps = []
+      insertedMics = inputMics
+
+      # Despite this function only should insert new micrographs
+      # let's double check that they are not inserted already
+      micList = [mic for mic in inputMics
+                 if getMicKeyFunc(mic) not in self.micDict]
+
+      def _insertSubset(micSubset):
+          stepIds = insertStepListFunc(micSubset, self.initialIds, *args)
+          return stepIds
+
+      # Now handle the steps depending on the streaming batch size
+      batchSize = self._getStreamingBatchSize()
+
+      if batchSize == 1:  # This is one by one, as before the batch size
+          for mic in micList:
+              stepId = insertStepFunc(mic, self.initialIds, *args)
+              deps.append(stepId)
+      elif batchSize == 0:  # Greedy, take all available ones
+          deps += _insertSubset(micList)
+      else:  # batchSize > 0, insert only batches of this size
+          n = len(inputMics)
+          d = int(n / batchSize)  # number of batches to insert
+          nd = d * batchSize
+          for i in range(d):
+              deps += _insertSubset(micList[i * batchSize:(i + 1) * batchSize])
+
+          if n > nd and self.streamClosed:  # insert last ones
+              deps += _insertSubset(micList[nd:])
+          else:
+              insertedMics = micList[:nd]
+
+      for mic in insertedMics:
+          self.micDict[getMicKeyFunc(mic)] = mic
+
+      return deps
+
+  def _insertPickMicrographListStep(self, micList, prerequisites, *args):
+      """ Basic method to insert a picking step for a given micrograph. """
+      micNameList = [mic.getMicName() for mic in micList]
+      gpuList = self.getGpuList()
+
+      stepIds = []
+      micNameSubSets = self.makeSubsets(micNameList, len(gpuList))
+      for gpuID, micNameSubset in zip(gpuList, micNameSubSets):
+          curArgs = tuple(list(args) + [gpuID])
+          micStepId = self._insertFunctionStep(self.pickMicrographListStep, micNameSubset, *curArgs,
+                                               prerequisites=prerequisites, needsGPU=False)
+          stepIds.append(micStepId)
+      return stepIds
