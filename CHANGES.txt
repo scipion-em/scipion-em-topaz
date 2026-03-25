@@ -1,3 +1,5 @@
+3.1.1:
+    - Output file search is updated to adapt to GPU parallelization
 3.1.0: Version installed 0.3.7.
        Training fixed.
 3.0.3:
