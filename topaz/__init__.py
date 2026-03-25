@@ -35,7 +35,7 @@ import pyworkflow as pw
 from .constants import *
 
 
-__version__ = '3.1.0'
+__version__ = '3.1.1'
 _references = ['Bepler2018']
 _logo = "topaz_logo.jpeg"
 
