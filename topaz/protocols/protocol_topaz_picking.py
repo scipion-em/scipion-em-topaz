@@ -24,7 +24,7 @@
 # *
 # **************************************************************************
 
-import os
+import os, re
 import time
 
 import pyworkflow.utils as pwutils
@@ -41,6 +41,8 @@ PICKING_DENOISE_FOLDER = 'picking_denoise_folder'
 PICKING_PRE_FOLDER = 'picking_pre_folder'
 PICKING_FOLDER = 'picking_folder'
 MODEL_FOLDER = 'model_folder'
+
+MICRO_BASE_FOLDER = "micrographs%(min)s-%(max)s"
 
 
 class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
@@ -110,7 +112,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
 
   def _defineFileDict(self):
     """ Centralize how files are called for iterations and references. """
-    pickingFolder = self._getTmpPath("micrographs%(min)s-%(max)s")
+    pickingFolder = self._getTmpPath(MICRO_BASE_FOLDER)
     pickingDenoiseFolder = os.path.join(pickingFolder, "denoise")
     pickingPreFolder = os.path.join(pickingFolder, "preprocess")
     myDict = {
@@ -174,12 +176,15 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
   def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
     """ Read the coordinates from a given list of micrographs """
 
-    outputParticlesFn = self.getPickingFileName(micDoneList,
-                                                TOPAZ_COORDINATES_FILE)
-
     scale = self.scale.get()
-    readSetOfCoordinates(outputParticlesFn, outputCoords.getMicrographs(),
-                         outputCoords, scale)
+
+    minMaxs = self.getPickingMinMax(micDoneList)
+    for kMin, kMax in minMaxs:
+        pickingFileName = self._getFileName(TOPAZ_COORDINATES_FILE, **{"min": kMin, 'max': kMax})
+
+
+        readSetOfCoordinates(pickingFileName, outputCoords.getMicrographs(),
+                             outputCoords, scale)
 
     if self.boxSize.get() == -1:
       boxSize = self.radius.get() * 2 * scale
@@ -192,10 +197,34 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     return self._getFileName(key, **{"min": micList[0].strId(),
                                      'max': micList[-1].strId()})
 
+  def getPickingMinMax(self, micList):
+      '''From the list of done micrographs, recover the corresponding picking filenames, which can result to be
+       in several files due to GPU parallelization'''
+      minId, maxId = micList[0].strId(), micList[-1].strId()
+
+      regexPattern = re.sub(r"%\((\w+)\)s", r"(?P<\1>.+)", os.path.basename(MICRO_BASE_FOLDER))
+      regex = re.compile(f"^{regexPattern}$")
+
+      matches = []
+      for name in os.listdir(self._getTmpPath()):
+          m = regex.match(name)
+          if m:
+              kMin, kMax = m.groupdict().values()
+              if int(kMin) >= int(minId) and int(kMax) <= int(maxId):
+                  matches.append((kMin, kMax))
+
+      return matches
+
+
 
   def _validate(self):
     validateMsgs = []
     if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
       if self.prevTopazModel.get() is None:
         validateMsgs.append('Model not ready')
+
+    nGPUs = len(getattr(self, params.GPU_LIST).get().split())
+    if self.numberOfThreads.get() <= nGPUs and nGPUs != 1:
+        validateMsgs.append('The number of threads must be at least 1 more than the number of assigned GPUs, since '
+                            'this software can only run 1 GPU per thread (and 1 thread is reserved for Scipion main)')
     return validateMsgs
