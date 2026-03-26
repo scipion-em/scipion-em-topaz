@@ -133,45 +133,46 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
 
   def _pickMicrographList(self, micList, *args):
     # Link or convert the whole set of micrographs to "batch" folders
-    workingDir = self.getPickingFileName(micList, PICKING_FOLDER)
-    pwutils.makePath(workingDir)
+    if len(micList) > 0:
+        workingDir = self.getPickingFileName(micList, PICKING_FOLDER)
+        pwutils.makePath(workingDir)
 
-    convert.convertMicrographs(micList, workingDir)
+        convert.convertMicrographs(micList, workingDir)
 
-    if self.doDenoise:
-      denoisedDir = self.getPickingFileName(micList, PICKING_DENOISE_FOLDER)
-      pwutils.makePath(denoisedDir)
-      # denoise the micrographs in the batch folder, output in denoisedDir
-      args = self.getDenoiseArgs(workingDir, denoisedDir)
-      Plugin.runTopaz(self, 'topaz denoise', args)
-      workingDir = denoisedDir
+        if self.doDenoise:
+          denoisedDir = self.getPickingFileName(micList, PICKING_DENOISE_FOLDER)
+          pwutils.makePath(denoisedDir)
+          # denoise the micrographs in the batch folder, output in denoisedDir
+          args = self.getDenoiseArgs(workingDir, denoisedDir)
+          Plugin.runTopaz(self, 'topaz denoise', args)
+          workingDir = denoisedDir
 
-    # create preprocessed folder under the workingDir.
-    # Now in the extra folder should be replaced in tmp folder
-    preprocessedDir = self.getPickingFileName(micList, PICKING_PRE_FOLDER)
-    pwutils.makePath(preprocessedDir)
+        # create preprocessed folder under the workingDir.
+        # Now in the extra folder should be replaced in tmp folder
+        preprocessedDir = self.getPickingFileName(micList, PICKING_PRE_FOLDER)
+        pwutils.makePath(preprocessedDir)
 
-    # preprocess the micrographs in the batch folder, output in preprocessedDir
-    args = self.getPreprocessArgs(workingDir, preprocessedDir)
-    Plugin.runTopaz(self, 'topaz preprocess', args)
+        # preprocess the micrographs in the batch folder, output in preprocessedDir
+        args = self.getPreprocessArgs(workingDir, preprocessedDir)
+        Plugin.runTopaz(self, 'topaz preprocess', args)
 
-    # perform prediction on the preprocessed micrographs
-    if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
-      modelFn = self.prevTopazModel.get().getPath()
-    elif self.modelInitialization.get() == self.ADD_MODEL_GENERAL:
-      modelFn = self.getEnumText('generalModel')
+        # perform prediction on the preprocessed micrographs
+        if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
+          modelFn = self.prevTopazModel.get().getPath()
+        elif self.modelInitialization.get() == self.ADD_MODEL_GENERAL:
+          modelFn = self.getEnumText('generalModel')
 
-    # Launch process called extract which is rather a prediction
-    args = ' -t {}'.format(self.threshold.get())
-    args += ' -r %d' % self.radius.get()
-    args += ' -m %s' % modelFn
-    args += ' -o %s' % self.getPickingFileName(micList,
-                                               TOPAZ_COORDINATES_FILE)
-    args += ' --num-workers %d' % self.numberOfThreads
-    args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
-    args += ' %s/*.mrc' % preprocessedDir
+        # Launch process called extract which is rather a prediction
+        args = ' -t {}'.format(self.threshold.get())
+        args += ' -r %d' % self.radius.get()
+        args += ' -m %s' % modelFn
+        args += ' -o %s' % self.getPickingFileName(micList,
+                                                   TOPAZ_COORDINATES_FILE)
+        args += ' --num-workers %d' % self.numberOfThreads
+        args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
+        args += ' %s/*.mrc' % preprocessedDir
 
-    Plugin.runTopaz(self, 'topaz extract', args)
+        Plugin.runTopaz(self, 'topaz extract', args)
 
   def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
     """ Read the coordinates from a given list of micrographs """
