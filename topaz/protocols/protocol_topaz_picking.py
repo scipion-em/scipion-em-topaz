@@ -182,7 +182,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     minMaxs = self.getPickingMinMax(micDoneList)
     for kMin, kMax in minMaxs:
         pickingFileName = self._getFileName(TOPAZ_COORDINATES_FILE, **{"min": kMin, 'max': kMax})
-
+        self.waitForCoordsFile(pickingFileName)
 
         readSetOfCoordinates(pickingFileName, outputCoords.getMicrographs(),
                              outputCoords, scale)
@@ -216,6 +216,11 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
 
       return matches
 
+  def waitForCoordsFile(self, coordsFile, cMax=5):
+      c = 0
+      while (not os.path.exists(coordsFile) or os.path.getsize(coordsFile) == 0) and c < cMax:
+          c += 1
+          time.sleep(c)
 
 
   def _validate(self):
