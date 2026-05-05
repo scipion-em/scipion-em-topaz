@@ -1,3 +1,7 @@
+3.1.2:
+    - Checks added to address:
+        - Coordinates files read before saved to disk
+        - Empty micList when continue
 3.1.1:
     - Output file search is updated to adapt to GPU parallelization
 3.1.0: Version installed 0.3.7.
