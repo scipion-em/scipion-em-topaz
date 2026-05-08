@@ -46,7 +46,154 @@ MICRO_BASE_FOLDER = "micrographs%(min)s-%(max)s"
 
 
 class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
-  """ Perform a picking using a topaz model """
+    """
+    Performs automatic particle picking on cryo-EM micrographs using a Topaz neural network model.
+
+    AI Generated:
+
+    Topaz Picking (TopazProtPicking) — User Manual
+        Overview
+
+        The Topaz Picking protocol performs automatic particle detection in cryo-EM micrographs
+        using deep learning models provided by the Topaz framework. Its purpose is to identify
+        candidate particle coordinates from raw micrographs so they can be used in downstream
+        extraction, classification, and reconstruction workflows.
+
+        For biological users, this protocol is typically applied after motion correction and
+        CTF estimation, once the micrographs are considered suitable for particle identification.
+        It is particularly useful when large datasets make manual picking impractical or when
+        reproducibility and consistency across many micrographs are required.
+
+        Inputs and General Workflow
+
+        The protocol requires a set of input micrographs and a Topaz model. The model can come
+        from one of two sources:
+
+        - A previously trained Topaz model generated inside the project.
+        - A pretrained general Topaz model distributed with the Topaz software.
+
+        During execution, the selected micrographs are first converted into a temporary working
+        directory. Optional denoising may be applied, followed by Topaz preprocessing
+        (typically downsampling and normalization). Once preprocessing is complete, the Topaz
+        extraction command is launched to predict particle coordinates.
+
+        The output is a set of coordinates associated with the original micrographs.
+
+        Model Selection
+
+        The protocol allows two model strategies.
+
+        If *TopazTrained* is selected, the protocol uses a model previously trained inside
+        the current Scipion project. This is the preferred option when the training data
+        closely matches the biological specimen under study.
+
+        If *TopazGeneral* is selected, one of the standard pretrained Topaz models is used.
+        These general models are convenient for exploratory work or for obtaining an initial
+        picking solution before specimen-specific training.
+
+        In biological practice, project-specific trained models usually outperform general
+        models when particle appearance differs significantly from the data used in Topaz’s
+        original training.
+
+        Preprocessing and Denoising
+
+        Before particle prediction, micrographs may optionally be denoised using one of the
+        Topaz denoising networks. This can improve detection performance when micrographs
+        are particularly noisy.
+
+        After denoising (or directly if denoising is disabled), micrographs are preprocessed.
+        Preprocessing generally includes downsampling according to the selected scale factor
+        and intensity normalization.
+
+        From a biological perspective, the scale factor should be chosen so that particles
+        remain recognizable after downsampling. Excessive downsampling may remove important
+        particle features, while too little downsampling increases computational cost.
+
+        Particle Detection Parameters
+
+        The most relevant parameters controlling picking behavior are:
+
+        Particle radius:
+            Defines the approximate particle radius in pixels. This parameter strongly affects
+            the extraction stage because it defines the expected particle size.
+
+        Extraction threshold:
+            Controls how restrictive the prediction is.
+            Higher thresholds produce fewer picks with higher confidence.
+            Lower thresholds produce more picks but increase false positives.
+
+        Box size:
+            Defines the extraction box size stored in the output coordinates.
+            If left at the default value, it is automatically estimated as:
+
+            box size = radius × 2 × scale
+
+        In practice, users often begin with the default threshold and inspect the resulting
+        picks visually. If too many contaminants are detected, increasing the threshold
+        usually improves specificity.
+
+        Parallel and Batch Processing
+
+        Micrographs are processed in batches. For each batch, the protocol creates dedicated
+        temporary directories for:
+
+        - Input converted micrographs
+        - Denoised micrographs (optional)
+        - Preprocessed micrographs
+        - Predicted coordinate files
+
+        This design allows efficient GPU parallelization and streaming execution in Scipion.
+        The protocol can process subsets of micrographs independently, which is especially
+        useful for large cryo-EM datasets.
+
+        Output Coordinates
+
+        After prediction, Topaz writes coordinate files for each processed batch.
+        The protocol then reads these files and converts the predicted coordinates
+        into Scipion coordinate objects.
+
+        The final output is a SetOfCoordinates linked to the original micrographs.
+
+        If multiple GPU batches are used, the protocol automatically identifies all
+        relevant coordinate files and merges them into a single output coordinate set.
+
+        Validation and GPU Considerations
+
+        The protocol checks that:
+
+        - A trained model is available if the *TopazTrained* option is selected.
+        - The number of CPU threads is larger than the number of assigned GPUs.
+
+        This restriction exists because Topaz uses one GPU per worker thread while one
+        additional thread is reserved for Scipion control.
+
+        Practical Recommendations
+
+        For routine cryo-EM work, the most effective strategy is often:
+
+        - Start with a pretrained general model.
+        - Use moderate downsampling.
+        - Inspect the coordinates visually.
+        - Train a specimen-specific Topaz model if needed.
+        - Re-run picking with the trained model for improved precision.
+
+        Denoising can be particularly useful for low-contrast cryo-EM data, but it is not
+        always necessary. In high-quality micrographs, preprocessing alone is often sufficient.
+
+        Final Perspective
+
+        Topaz picking transforms particle detection from a manual, subjective task into a
+        scalable and reproducible machine-learning step.
+
+        For most cryo-EM users, the key factors for reliable picking are:
+
+        - choosing an appropriate model,
+        - selecting a realistic particle radius,
+        - using a threshold adapted to the biological sample.
+
+        When tuned properly, this protocol provides a robust starting point for downstream
+        single-particle analysis.
+    """
   _label = 'picking'
 
   ADD_MODEL_TRAIN_TYPES = ["TopazTrained", "TopazGeneral"]
