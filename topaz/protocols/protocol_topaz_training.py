@@ -55,7 +55,164 @@ PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 
 class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
-  """ Train and save a Topaz model"""
+    """
+    Trains a Topaz particle-picking model from input coordinates and
+    micrographs.
+
+    AI Generated:
+
+    Topaz Training (TopazProtTraining) — User Manual
+        Overview
+
+        The Topaz Training protocol generates a particle-picking model
+        using manually curated particle coordinates together with their
+        associated micrographs.
+
+        Its main purpose is to learn the appearance of particles from
+        experimental data so that the resulting model can later be used
+        for automatic particle picking in similar datasets.
+
+        In practical cryo-EM workflows, this protocol is typically used
+        after an initial manual picking stage, once a representative set
+        of particle coordinates is available.
+
+        Input Parameters
+
+        The protocol requires one main biological input:
+
+        Input coordinates:
+            A SetOfCoordinates object containing manually curated
+            particle positions.
+
+        Model initialization:
+            The user may choose between two strategies:
+
+            - New:
+              A new neural network is initialized from scratch.
+
+            - TopazModel:
+              A previously trained Topaz model is used as the starting
+              point for continued training.
+
+        If training starts from scratch, the user must choose the CNN
+        architecture. Available models include resnet8, resnet16,
+        conv31, conv63, and conv127.
+
+        Training Dataset Preparation
+
+        The protocol automatically extracts a user-defined number of
+        micrographs for training.
+
+        Micrographs are divided into training and test subsets
+        according to the selected K-fold value.
+
+        This separation is biologically important because it allows
+        evaluation of whether the trained model generalizes beyond the
+        exact images used for optimization.
+
+        For each selected micrograph:
+
+        - The corresponding image is copied or converted into MRC format.
+        - Particle coordinates are rescaled according to the selected
+          downsampling factor.
+        - Coordinate lists are written into Topaz-compatible training
+          files.
+
+        If streaming is enabled, the protocol waits until enough
+        micrographs are available before starting the training process.
+
+        Pre-processing Workflow
+
+        Before training, the protocol performs image preparation steps.
+
+        Optional denoising:
+            If enabled, micrographs are denoised using one of the
+            supported Topaz denoising networks.
+
+        Preprocessing:
+            Micrographs are downsampled according to the scale factor
+            and normalized.
+
+        From a practical cryo-EM perspective, downsampling is useful
+        because Topaz generally performs best when particles occupy a
+        moderate number of pixels. Excessively large particles may
+        require stronger downsampling.
+
+        Training Parameters
+
+        Several parameters control the optimization process.
+
+        Particle radius:
+            Defines the particle neighborhood used during learning.
+
+        Autoencoder:
+            Adds a reconstruction objective that can help regularize
+            training.
+
+        Number of epochs:
+            Controls how many passes are performed over the training
+            dataset.
+
+        Training method:
+            Defines the statistical learning objective. Available
+            methods include PN, GE-KL, GE-binomial, and PU.
+
+        Number of particles per image:
+            Provides the expected particle density per micrograph.
+
+        Advanced users can also provide additional Topaz command-line
+        options through the advanced parameter field.
+
+        Internal Workflow
+
+        The protocol executes the following sequence:
+
+        1. Convert input coordinates and prepare training/test files.
+        2. Optionally denoise the selected micrographs.
+        3. Preprocess the micrographs.
+        4. Launch Topaz training with the selected parameters.
+        5. Detect the final trained model corresponding to the last
+           training epoch.
+        6. Register the model as protocol output.
+
+        Output
+
+        After successful execution, the protocol produces:
+
+        outputModel:
+            A TopazModel object corresponding to the final trained
+            network.
+
+        This output can be used directly by downstream Topaz picking
+        protocols or as initialization for additional training.
+
+        Practical Recommendations
+
+        For most biological datasets, training quality depends much
+        more on the quality of input coordinates than on aggressive
+        parameter tuning.
+
+        A small but representative set of clean coordinates usually
+        produces better results than a large set of noisy annotations.
+
+        Recommended practical guidelines:
+
+        - Use coordinates covering the variability of particle views.
+        - Ensure micrographs are representative of the full dataset.
+        - Adjust the downsampling factor so particles match the
+          recommended input size for the selected network.
+        - Start with default parameters before exploring advanced
+          optimization settings.
+
+        Final Perspective
+
+        The Topaz Training protocol converts curated particle
+        annotations into a reusable machine-learning picking model.
+
+        In modern cryo-EM workflows, this step often marks the
+        transition from manual particle selection to scalable,
+        automated particle picking across large datasets.
+    """
   _label = 'training'
 
   ADD_MODEL_TRAIN_TYPES = ["New", "TopazModel"]
