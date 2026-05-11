@@ -46,7 +46,169 @@ MICRO_BASE_FOLDER = "micrographs%(min)s-%(max)s"
 
 
 class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
-  """ Perform a picking using a topaz model """
+    """
+    Performs automated particle picking on cryo-EM micrographs using neural
+    network models from the Topaz framework. The protocol is intended to
+    identify candidate particle locations directly from micrograph data,
+    producing coordinate sets suitable for downstream extraction,
+    classification, and reconstruction.
+
+    AI Generated:
+
+    Topaz Particle Picking (TopazProtPicking) — User Manual
+        Overview
+
+        The Topaz particle picking protocol provides automated particle
+        detection for cryo-electron microscopy micrographs using deep
+        learning–based models. Its main objective is to transform raw
+        micrograph images into biologically meaningful particle coordinate
+        sets, enabling efficient downstream single-particle workflows.
+        Instead of relying on manually tuned templates or user-defined
+        heuristics, the protocol leverages learned image features to detect
+        particles even in difficult datasets with low contrast, uneven ice,
+        contamination, or heterogeneous particle appearance.
+
+        For biological users, this protocol is particularly valuable when
+        processing large collections of micrographs where manual picking
+        would be impractical. It is commonly used both in exploratory
+        projects, where rapid feedback is important, and in production
+        workflows where reproducibility and throughput are essential.
+
+        Model Selection and Biological Context
+
+        The protocol can operate using either a previously trained Topaz
+        model or one of the general pretrained models distributed with the
+        Topaz ecosystem. This distinction is biologically important.
+
+        A previously trained model is typically preferable when it was
+        generated from particles closely related to the current dataset.
+        In such cases, the learned representation often captures specimen-
+        specific characteristics such as preferred orientations, particle
+        size, ice thickness behavior, or imaging conditions. This usually
+        leads to higher precision and more biologically reliable particle
+        localization.
+
+        General pretrained models provide a convenient starting point when
+        no project-specific training is available. They are especially
+        useful during early exploratory work, feasibility assessments, or
+        rapid screening of newly acquired datasets. However, because these
+        models were trained on broader data, they may not optimally capture
+        the morphology of highly unusual particles, elongated assemblies,
+        membrane proteins, or strongly flexible complexes.
+
+        Input Micrographs and Preprocessing
+
+        The protocol operates directly on input micrographs. In practical
+        cryo-EM work, the quality of these micrographs strongly influences
+        the final picking results. Clean micrographs with well-estimated
+        CTF parameters and limited contamination generally produce the most
+        reliable coordinates.
+
+        Before particle prediction, the protocol may apply denoising and
+        preprocessing transformations. These operations are not merely
+        computational conveniences—they can substantially affect biological
+        interpretability.
+
+        Denoising can improve particle detectability in especially noisy
+        datasets. This is often useful for small particles, weakly
+        scattering complexes, or micrographs collected at low dose.
+        Nevertheless, excessive denoising may alter subtle structural
+        features, so users should interpret improvements with caution.
+
+        Preprocessing also performs downsampling. In most biological
+        applications this improves robustness by emphasizing larger
+        particle-scale features over high-frequency noise. A practical
+        consequence is that picking becomes more stable and faster, but
+        users should remember that very small particles may require more
+        careful parameter tuning.
+
+        Particle Radius and Detection Sensitivity
+
+        The particle radius is one of the most biologically meaningful
+        parameters because it defines the expected scale of the target
+        particle. A good practical estimate usually corresponds to roughly
+        half the particle diameter measured in pixels.
+
+        If the radius is set too small, extended complexes may be only
+        partially represented, often increasing false positives or causing
+        unstable center placement. If the radius is too large, nearby
+        contaminants or neighboring particles may be merged into the
+        prediction signal.
+
+        The extraction threshold controls the confidence level required for
+        accepting predicted particles. Lower thresholds typically recover
+        more candidates, increasing sensitivity but also introducing more
+        false positives. Higher thresholds provide more conservative
+        coordinate sets, often preferred when preparing cleaner inputs for
+        high-resolution refinement.
+
+        In biological practice, the best threshold depends strongly on the
+        purpose of the experiment. Initial exploratory rounds often benefit
+        from permissive thresholds, whereas final production datasets
+        generally require more stringent settings.
+
+        Streaming and Large-Scale Processing
+
+        The protocol is designed to support streaming and batch-oriented
+        processing of large micrograph collections. This is particularly
+        relevant in modern cryo-EM facilities where data may be acquired
+        continuously during microscope sessions.
+
+        From a biological workflow perspective, streaming enables early
+        quality assessment. Users can quickly determine whether particles
+        are visible, whether ice quality is acceptable, and whether the
+        selected model is appropriate, often before the full acquisition
+        session is complete.
+
+        Parallel processing also makes the protocol suitable for large
+        screening projects, ligand campaigns, or heterogeneous datasets
+        collected under multiple conditions.
+
+        Outputs and Interpretation
+
+        The protocol produces a set of particle coordinates associated with
+        the processed micrographs. These coordinates define the candidate
+        particle centers and can be used directly for extraction and
+        downstream classification.
+
+        The resulting box size is determined so that extracted particles
+        preserve enough surrounding context for later processing. From a
+        biological standpoint, this is important because excessively small
+        boxes may truncate flexible regions or peripheral domains, while
+        overly large boxes may introduce unnecessary background noise.
+
+        Users should always visually inspect a representative subset of the
+        coordinates overlaid on micrographs. Even high-performing neural
+        network pickers can be biased by contamination, carbon edges,
+        crystalline ice, or preferred orientations that mimic true
+        particles.
+
+        Practical Recommendations
+
+        For most biological applications, a good starting strategy is to
+        begin with a pretrained general model and visually inspect the
+        resulting picks. If particle localization appears systematically
+        biased or incomplete, using a project-specific trained model often
+        provides the largest improvement.
+
+        Denoising can be especially helpful for small proteins, low-dose
+        data, or challenging vitrification conditions, but it should be
+        introduced conservatively. The particle radius should reflect the
+        expected biological particle size as closely as possible, while the
+        threshold should be adjusted depending on whether the goal is broad
+        discovery or clean production picking.
+
+        Final Perspective
+
+        For cryo-EM users, automated particle picking is more than a
+        convenience—it is one of the earliest biological filtering steps
+        in the entire single-particle workflow. The quality of the selected
+        coordinates strongly influences extraction, classification,
+        reconstruction, and ultimately structural interpretation. Careful
+        choice of model, thoughtful preprocessing, and biologically
+        informed parameter tuning are therefore essential for reliable
+        downstream results.
+    """
   _label = 'picking'
 
   ADD_MODEL_TRAIN_TYPES = ["TopazTrained", "TopazGeneral"]

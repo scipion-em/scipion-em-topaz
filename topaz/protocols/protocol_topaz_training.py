@@ -55,7 +55,152 @@ PARTICLES_TRAIN_TXT = 'particles_train.txt'
 
 
 class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
-  """ Train and save a Topaz model"""
+    """
+    Trains a Topaz particle-picking model from annotated cryo-EM
+micrographs, producing a reusable model that can later be applied to
+automatic particle detection in new datasets.
+
+    AI Generated:
+
+    Topaz Training (TopazProtTraining) — User Manual
+        Overview
+
+        The Topaz Training protocol is designed to generate a particle-picking model adapted to the
+        characteristics of a specific cryo-EM dataset. Its primary purpose is to learn the visual
+        appearance of particles from user-provided coordinate annotations and to transform that
+        information into a predictive model that can later be used for automated particle detection.
+
+        In practical cryo-EM workflows, this protocol is especially valuable when generic pretrained
+        models do not capture the appearance of the specimen well enough, or when users wish to obtain
+        a model specialized for a particular particle type, microscope setup, ice condition, or image
+        acquisition strategy. The resulting model becomes a reusable asset that can support future
+        picking runs, iterative refinement, or transfer to related datasets.
+
+        Inputs and Biological Context
+
+        The protocol requires a set of particle coordinates associated with a collection of
+        micrographs. These coordinates represent the biological examples from which the model learns.
+        Their quality strongly determines the final usefulness of the trained model. If the
+        annotations contain systematic bias, inaccurate centering, or heterogeneous particle classes,
+        the resulting model may reproduce those inconsistencies.
+
+        From a biological perspective, the most informative annotations usually correspond to particles
+        that clearly represent the structural target of interest and cover a representative range of
+        defocus, ice thickness, and image quality. Including only ideal particles may lead to a model
+        that performs poorly under realistic experimental variability, while including highly ambiguous
+        particles may reduce discriminative power.
+
+        Model Initialization Strategy
+
+        The protocol supports both de novo learning and continuation from a previously trained model.
+        Starting from a new model is appropriate when dealing with a novel specimen or when no prior
+        Topaz model is available that resembles the biological target.
+
+        Continuing from a previously trained model is often advantageous when the new dataset is
+        related to an earlier one. For example, users may refine a model trained on one biochemical
+        condition and adapt it to another condition involving the same macromolecular complex. In this
+        situation, the protocol can accelerate convergence and often improve robustness when only a
+        modest number of new annotations are available.
+
+        Training Dataset Construction
+
+        A key objective of the protocol is to build a coherent training and validation framework from
+        the annotated data. Rather than relying on a single micrograph, it uses multiple micrographs
+        so that the resulting model captures dataset-level variability instead of learning only
+        image-specific characteristics.
+
+        This is biologically important because cryo-EM micrographs often vary substantially in ice
+        thickness, contamination, carbon support, particle concentration, and imaging conditions. A
+        model trained from several representative micrographs is more likely to generalize well during
+        large-scale automated picking.
+
+        The protocol also reserves part of the available information for internal validation. This
+        separation between training and testing helps estimate whether the model captures genuine
+        particle features rather than overfitting peculiarities of the annotated images.
+
+        Preprocessing and Image Conditioning
+
+        Before learning begins, the micrographs are conditioned so that particle appearance becomes
+        more uniform and more suitable for machine-learning analysis. This usually includes
+        downsampling and normalization, and may optionally include denoising.
+
+        From a biological standpoint, downsampling should preserve the structural size of the target
+        while reducing unnecessary high-frequency detail. The selected particle radius should therefore
+        remain consistent with the effective particle dimensions after scaling. Excessive reduction may
+        erase useful structural cues, whereas insufficient reduction may increase computational cost
+        without providing additional biological value.
+
+        Optional denoising can be beneficial when raw images are especially noisy or when particles are
+        difficult to distinguish from the background. However, users should remain cautious: aggressive
+        denoising may simplify subtle particle features and can occasionally reduce discrimination
+        between true particles and structured contamination.
+
+        Choice of Neural Network Model
+
+        The protocol provides several neural-network model families that differ mainly in the effective
+        particle size they can represent. Choosing an appropriate model is biologically important
+        because cryo-EM particles vary greatly in apparent diameter after preprocessing.
+
+        Smaller architectures are often well suited to compact particles or aggressively downsampled
+        images. Larger receptive-field models are more appropriate for bigger particles, elongated
+        complexes, or cases where larger structural context helps distinguish particles from
+        background.
+
+        In practice, the safest strategy is to select a model whose effective receptive field matches
+        the approximate particle diameter after preprocessing. A poor match may lead to weak learning,
+        unstable detection, or systematic false positives.
+
+        Learning Objective and Optimization
+
+        The protocol supports several learning formulations that influence how particle and background
+        information are interpreted during optimization. For most routine biological applications,
+        default settings are often sufficient. However, advanced users may adjust these choices when
+        dealing with sparse particles, difficult backgrounds, or highly imbalanced datasets.
+
+        The expected number of particles per micrograph also influences the statistical assumptions of
+        the learning process. When this estimate roughly matches experimental reality, the resulting
+        model generally produces more biologically plausible confidence distributions during picking.
+
+        An optional autoencoder component can be incorporated to encourage additional image-structure
+        awareness. This may sometimes improve robustness in challenging datasets, although excessive
+        emphasis on reconstruction can reduce the specificity of particle discrimination.
+
+        Interpretation of Training Output
+
+        At the end of the procedure, the protocol produces a trained Topaz model ready for downstream
+        particle picking. Biologically, this output represents a learned description of particle
+        appearance rather than a direct structural reconstruction.
+
+        A strong model usually yields consistent particle detection across micrographs with different
+        imaging conditions. A weak model may detect particles only in the easiest images, may miss
+        low-contrast particles, or may confuse contamination and carbon edges with true molecular
+        projections.
+
+        Practical Recommendations
+
+        For most cryo-EM users, the most reliable training sets contain manually curated coordinates
+        distributed across several representative micrographs rather than large numbers of picks taken
+        from only a few images. Quality and diversity usually matter more than raw annotation count.
+
+        When working with a new specimen, beginning with moderate preprocessing, a realistic particle
+        radius, and a conservative number of training epochs is often the most effective strategy.
+        After inspecting the resulting picking behavior, users can refine the model with additional
+        coordinates or continue training from the previously generated model.
+
+        If particle appearance varies strongly across biochemical states or acquisition sessions, it is
+        often preferable to retrain or fine-tune the model rather than assuming full transferability.
+        Even closely related datasets may differ enough to affect picking quality in biologically
+        meaningful ways.
+
+        Final Perspective
+
+        For cryo-EM practitioners, model training is more than a technical preprocessing step. It is
+        the stage at which biological prior knowledge—expressed through curated particle
+        annotations—is converted into an automated decision system. The reliability of downstream
+        particle picking therefore depends directly on how representative the training annotations are,
+        how appropriate the preprocessing choices remain for the particle size, and how well the
+        trained model reflects the real structural diversity present in the experiment.
+    """
   _label = 'training'
 
   ADD_MODEL_TRAIN_TYPES = ["New", "TopazModel"]
