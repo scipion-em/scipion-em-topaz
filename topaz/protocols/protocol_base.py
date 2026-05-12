@@ -31,6 +31,7 @@ from pwem.protocols import EMProtocol
 import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as cons
 
+
 class ProtTopazBase(EMProtocol):
     """
     Provides a common framework for Topaz-based cryo-EM preprocessing workflows, with emphasis on
@@ -146,10 +147,13 @@ class ProtTopazBase(EMProtocol):
         foundation, this protocol helps transform raw micrographs into more reliable inputs for
         automated particle analysis and subsequent structural investigation.
     """
-  def __init__(self, **args):
+
+
+def __init__(self, **args):
     EMProtocol.__init__(self, **args)
 
-  def _definePreprocessParams(self, form):
+
+def _definePreprocessParams(self, form):
     form.addSection('Pre-process')
     group = form.addGroup('Denoise')
     group.addParam('doDenoise', params.BooleanParam, default=False,
@@ -189,44 +193,44 @@ class ProtTopazBase(EMProtocol):
                         " First core index is 0, second 1 and so on.")
 
 
-  #UTILS for preprocess steps
-  def getDenoiseArgs(self, inputDir, outDir):
-      args = ' %s/*.mrc -o %s/' % (inputDir, outDir)
-      args += ' --model %s' % self.getEnumText('modelDenoise')
-      args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
-      if self.patchSize.get() > 0:
+    # UTILS for preprocess steps
+
+
+def getDenoiseArgs(self, inputDir, outDir):
+    args = ' %s/*.mrc -o %s/' % (inputDir, outDir)
+    args += ' --model %s' % self.getEnumText('modelDenoise')
+    args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
+    if self.patchSize.get() > 0:
         args += ' --patch-size %s' % self.patchSize.get()
 
-      if self.denoiseExtra.hasValue():
+    if self.denoiseExtra.hasValue():
         args += ' ' + self.denoiseExtra.get()
-      else:
+    else:
         args += ' --normalize'
 
-      return args
+    return args
 
-  def getPreprocessArgs(self, inputDir, outDir):
+
+def getPreprocessArgs(self, inputDir, outDir):
     args = " %s/*.mrc -o %s/" % (inputDir, outDir)
     args += " --scale %d " % self.scale.get()
     args += ' --num-workers %d' % self.numberOfThreads
     args += ' --device %(GPU)s'  # Add GPU that will be set by the executor
 
     if self.preExtra.hasValue():
-      args += ' ' + self.preExtra.get()
+        args += ' ' + self.preExtra.get()
 
     return args
 
-  def getOutputModelPath(self):
+
+def getOutputModelPath(self):
     return self.MODEL
 
-  def getLastEpochModel(self, modelsDir, ext='.sav'):
+
+def getLastEpochModel(self, modelsDir, ext='.sav'):
     '''Return the last trained model, in alphabetic order (last trained epoch) in modelsDir'''
     modelFn = 'model.sav'
     for file in os.listdir(modelsDir):
-      if ext in file:
-        modelFn = file
+        if ext in file:
+            modelFn = file
     return os.path.join(modelsDir, modelFn)
-
-
-
-
-
