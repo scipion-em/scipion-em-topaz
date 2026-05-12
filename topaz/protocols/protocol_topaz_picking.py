@@ -209,24 +209,28 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
         informed parameter tuning are therefore essential for reliable
         downstream results.
     """
-  _label = 'picking'
 
-  ADD_MODEL_TRAIN_TYPES = ["TopazTrained", "TopazGeneral"]
-  ADD_MODEL_PRETRAINED = 0
-  ADD_MODEL_GENERAL = 1
 
-  GENERAL_MODELS = ["resnet16_u64", "resnet16_u32", "resnet8_u64", "resnet8_u32"]
-  MODEL_RESNET16_U64 = 0
-  MODEL_RESNET16_U32 = 1
-  MODEL_RESNET8_U64 = 2
-  MODEL_RESNET8_U32 = 3
+_label = 'picking'
 
-  def __init__(self, **args):
+ADD_MODEL_TRAIN_TYPES = ["TopazTrained", "TopazGeneral"]
+ADD_MODEL_PRETRAINED = 0
+ADD_MODEL_GENERAL = 1
+
+GENERAL_MODELS = ["resnet16_u64", "resnet16_u32", "resnet8_u64", "resnet8_u32"]
+MODEL_RESNET16_U64 = 0
+MODEL_RESNET16_U32 = 1
+MODEL_RESNET8_U64 = 2
+MODEL_RESNET8_U32 = 3
+
+
+def __init__(self, **args):
     ProtParticlePickingAuto.__init__(self, **args)
     self.stepsExecutionMode = cons.STEPS_PARALLEL
 
-  # -------------------------- DEFINE param functions -----------------------
-  def _defineParams(self, form):
+
+# -------------------------- DEFINE param functions -----------------------
+def _defineParams(self, form):
     ProtParticlePickingAuto._defineParams(self, form)
     form.addParam('modelInitialization', params.EnumParam,
                   choices=self.ADD_MODEL_TRAIN_TYPES,
@@ -267,33 +271,37 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     self._defineStreamingParams(form)
     form.getParam('streamingBatchSize').setDefault(32)
 
-  # -------------------------- INSERT steps functions -----------------------
-  def _insertInitialSteps(self):
+
+# -------------------------- INSERT steps functions -----------------------
+def _insertInitialSteps(self):
     self._defineFileDict()
     return []
 
-  def _defineFileDict(self):
+
+def _defineFileDict(self):
     """ Centralize how files are called for iterations and references. """
     pickingFolder = self._getTmpPath(MICRO_BASE_FOLDER)
     pickingDenoiseFolder = os.path.join(pickingFolder, "denoise")
     pickingPreFolder = os.path.join(pickingFolder, "preprocess")
     myDict = {
-      MODEL_FOLDER: self._getExtraPath("model"),
-      PICKING_FOLDER: pickingFolder,
-      PICKING_DENOISE_FOLDER: pickingDenoiseFolder,
-      PICKING_PRE_FOLDER: pickingPreFolder,
-      TOPAZ_COORDINATES_FILE: os.path.join(pickingPreFolder,
-                                           "topaz_coordinates%(min)s-%(max)s.txt")
+        MODEL_FOLDER: self._getExtraPath("model"),
+        PICKING_FOLDER: pickingFolder,
+        PICKING_DENOISE_FOLDER: pickingDenoiseFolder,
+        PICKING_PRE_FOLDER: pickingPreFolder,
+        TOPAZ_COORDINATES_FILE: os.path.join(pickingPreFolder,
+                                             "topaz_coordinates%(min)s-%(max)s.txt")
     }
 
     self._updateFilenamesDict(myDict)
 
-  # --------------------------- STEPS functions ------------------------------
-  def _pickMicrograph(self, micrograph, *args):
+
+# --------------------------- STEPS functions ------------------------------
+def _pickMicrograph(self, micrograph, *args):
     """Picking the given micrograph. """
     self._pickMicrographList([micrograph], *args)
 
-  def _pickMicrographList(self, micList, *args):
+
+def _pickMicrographList(self, micList, *args):
     # Link or convert the whole set of micrographs to "batch" folders
     if len(micList) > 0:
         workingDir = self.getPickingFileName(micList, PICKING_FOLDER)
@@ -302,12 +310,12 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
         convert.convertMicrographs(micList, workingDir)
 
         if self.doDenoise:
-          denoisedDir = self.getPickingFileName(micList, PICKING_DENOISE_FOLDER)
-          pwutils.makePath(denoisedDir)
-          # denoise the micrographs in the batch folder, output in denoisedDir
-          args = self.getDenoiseArgs(workingDir, denoisedDir)
-          Plugin.runTopaz(self, 'topaz denoise', args)
-          workingDir = denoisedDir
+            denoisedDir = self.getPickingFileName(micList, PICKING_DENOISE_FOLDER)
+            pwutils.makePath(denoisedDir)
+            # denoise the micrographs in the batch folder, output in denoisedDir
+            args = self.getDenoiseArgs(workingDir, denoisedDir)
+            Plugin.runTopaz(self, 'topaz denoise', args)
+            workingDir = denoisedDir
 
         # create preprocessed folder under the workingDir.
         # Now in the extra folder should be replaced in tmp folder
@@ -320,9 +328,9 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
 
         # perform prediction on the preprocessed micrographs
         if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
-          modelFn = self.prevTopazModel.get().getPath()
+            modelFn = self.prevTopazModel.get().getPath()
         elif self.modelInitialization.get() == self.ADD_MODEL_GENERAL:
-          modelFn = self.getEnumText('generalModel')
+            modelFn = self.getEnumText('generalModel')
 
         # Launch process called extract which is rather a prediction
         args = ' -t {}'.format(self.threshold.get())
@@ -336,7 +344,8 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
 
         Plugin.runTopaz(self, 'topaz extract', args)
 
-  def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
+
+def readCoordsFromMics(self, outputDir, micDoneList, outputCoords):
     """ Read the coordinates from a given list of micrographs """
 
     scale = self.scale.get()
@@ -350,46 +359,49 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
                              outputCoords, scale)
 
     if self.boxSize.get() == -1:
-      boxSize = self.radius.get() * 2 * scale
+        boxSize = self.radius.get() * 2 * scale
     else:
-      boxSize = self.boxSize.get()
+        boxSize = self.boxSize.get()
     outputCoords.setBoxSize(boxSize)
 
-  # --------------------------- UTILS functions --------------------------
-  def getPickingFileName(self, micList, key):
+
+# --------------------------- UTILS functions --------------------------
+def getPickingFileName(self, micList, key):
     return self._getFileName(key, **{"min": micList[0].strId(),
                                      'max': micList[-1].strId()})
 
-  def getPickingMinMax(self, micList):
-      '''From the list of done micrographs, recover the corresponding picking filenames, which can result to be
-       in several files due to GPU parallelization'''
-      minId, maxId = micList[0].strId(), micList[-1].strId()
 
-      regexPattern = re.sub(r"%\((\w+)\)s", r"(?P<\1>.+)", os.path.basename(MICRO_BASE_FOLDER))
-      regex = re.compile(f"^{regexPattern}$")
+def getPickingMinMax(self, micList):
+    '''From the list of done micrographs, recover the corresponding picking filenames, which can result to be
+     in several files due to GPU parallelization'''
+    minId, maxId = micList[0].strId(), micList[-1].strId()
 
-      matches = []
-      for name in os.listdir(self._getTmpPath()):
-          m = regex.match(name)
-          if m:
-              kMin, kMax = m.groupdict().values()
-              if int(kMin) >= int(minId) and int(kMax) <= int(maxId):
-                  matches.append((kMin, kMax))
+    regexPattern = re.sub(r"%\((\w+)\)s", r"(?P<\1>.+)", os.path.basename(MICRO_BASE_FOLDER))
+    regex = re.compile(f"^{regexPattern}$")
 
-      return matches
+    matches = []
+    for name in os.listdir(self._getTmpPath()):
+        m = regex.match(name)
+        if m:
+            kMin, kMax = m.groupdict().values()
+            if int(kMin) >= int(minId) and int(kMax) <= int(maxId):
+                matches.append((kMin, kMax))
 
-  def waitForCoordsFile(self, coordsFile, cMax=5):
-      c = 0
-      while (not os.path.exists(coordsFile) or os.path.getsize(coordsFile) == 0) and c < cMax:
-          c += 1
-          time.sleep(c)
+    return matches
 
 
-  def _validate(self):
+def waitForCoordsFile(self, coordsFile, cMax=5):
+    c = 0
+    while (not os.path.exists(coordsFile) or os.path.getsize(coordsFile) == 0) and c < cMax:
+        c += 1
+        time.sleep(c)
+
+
+def _validate(self):
     validateMsgs = []
     if self.modelInitialization.get() == self.ADD_MODEL_PRETRAINED:
-      if self.prevTopazModel.get() is None:
-        validateMsgs.append('Model not ready')
+        if self.prevTopazModel.get() is None:
+            validateMsgs.append('Model not ready')
 
     nGPUs = len(getattr(self, params.GPU_LIST).get().split())
     if self.numberOfThreads.get() <= nGPUs and nGPUs != 1:
