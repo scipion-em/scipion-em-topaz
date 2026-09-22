@@ -98,10 +98,22 @@ class Plugin(pwem.Plugin):
         cudaVersion = cls.getVersionFromPath(pwem.Config.CUDA_LIB, pattern="cuda",
                                              default="11.6")
 
-        # toolkitVersion = "10.2" if cudaVersion.major == 10 else "11.3"
-        # Install downloaded code
-        installationCmd += 'conda install -y topaz=%s fsspec pytorch-cuda=%s '\
-                           '-c tbepler -c  pytorch -c nvidia&&' % (version, cudaVersion)
+        # Install a compatible CUDA-enabled PyTorch stack. Restrict channels
+        # so user-level Conda configuration cannot replace it with a CPU build.
+        installationCmd += (
+            'conda install -y --override-channels --strict-channel-priority '
+            'topaz=%s fsspec pytorch==2.3.1 torchvision==0.18.1 '
+            "pytorch-cuda=%s 'mkl<2024.1' 'setuptools<81' "
+            '-c pytorch -c nvidia -c tbepler -c defaults &&'
+            % (version, cudaVersion)
+        )
+
+        # Do not mark the package as installed until the runtime is usable.
+        installationCmd += (
+            'python -c "import torch, torchvision; '
+            'assert torch.version.cuda is not None" &&'
+        )
+        installationCmd += 'topaz --help >/dev/null &&'
 
         # Flag installation finished
         installationCmd += 'touch %s' % TOPAZ_INSTALLED

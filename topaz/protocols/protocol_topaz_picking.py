@@ -184,7 +184,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
         pickingFileName = self._getFileName(TOPAZ_COORDINATES_FILE, **{"min": kMin, 'max': kMax})
         self.waitForCoordsFile(pickingFileName)
 
-        readSetOfCoordinates(pickingFileName, outputCoords.getMicrographs(),
+        readSetOfCoordinates(pickingFileName, micDoneList,
                              outputCoords, scale)
 
     if self.boxSize.get() == -1:
@@ -211,7 +211,7 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
           m = regex.match(name)
           if m:
               kMin, kMax = m.groupdict().values()
-              if int(kMin) >= int(minId) and int(kMax) <= int(maxId):
+              if int(kMax) >= int(minId) and int(kMin) <= int(maxId):
                   matches.append((kMin, kMax))
 
       return matches
