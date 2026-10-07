@@ -213,6 +213,13 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
     enoughMicrographs = False
 
     while True:
+      # Waiting for coordinates that will never come: an aborted run has
+      # nothing left to train on, and a loop that keeps polling leaves a
+      # step that can only end when the producer does.
+      if self._streamingMustStop():
+        raise Exception("Run stopped while waiting for enough input "
+                        "coordinates to train on.")
+
       micIds = []
       coordSet.loadAllProperties()
 

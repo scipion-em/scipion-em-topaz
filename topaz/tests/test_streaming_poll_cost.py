@@ -138,9 +138,11 @@ class _CoordOutput(LogicalSetFake):
     def __init__(self, micIds):
         super().__init__([], streamClosed=False)
         self._micIds = list(micIds)
+        self.uniqueCalls = 0
 
     def getUniqueValues(self, attributes, where=None):
         if attributes == '_micId':
+            self.uniqueCalls += 1
             return list(self._micIds)
 
         return super().getUniqueValues(attributes, where=where)
@@ -224,6 +226,31 @@ class TestTopazCompletionWithoutSidecars(unittest.TestCase):
 
         self.assertEqual([], protocol.published)
 
+    def testPublishingARoundIsRememberedWithoutRereadingTheOutput(self):
+        """The poll that publishes has to record what it published.
+
+        Nothing else will: the ids are read back from the output only
+        once, so a round that publishes without saying so leaves those
+        micrographs looking unpublished for the rest of the run - and
+        completion is counted against them.
+        """
+        protocol = _OutputHarness()
+        before = protocol.outputCoordinates.uniqueCalls
+
+        protocol._checkNewOutput()
+
+        self.assertEqual(
+            protocol._getPublishedPickingMicIds(),
+            {1, 2},
+            "The micrographs just published are not in the set of "
+            "published ids.",
+        )
+        self.assertEqual(
+            protocol.outputCoordinates.uniqueCalls,
+            before + 1,
+            "Recording them must not cost another scan of the output.",
+        )
+
     def testFinishingReleasesTheWaitingOutputStep(self):
         # createOutputStep is scheduled with wait=True and stays WAITING
         # until this releases it; forget that and the protocol hangs with
@@ -284,3 +311,64 @@ class TestTopazStepGraphScan(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _CountingCoordOutput:
+    """An output Set that records how often it is asked for every id."""
+
+    def __init__(self, micIds=()):
+        self.micIds = list(micIds)
+        self.uniqueValueCalls = 0
+
+    def getUniqueValues(self, attribute, where=None):
+        self.uniqueValueCalls += 1
+        return list(self.micIds)
+
+
+class _PublishedIdsHarness(TopazProtPicking):
+    def __init__(self, output):
+        self.outputCoordinates = output
+
+
+class TestTopazPublishedIdsAreNotRereadEveryPoll(unittest.TestCase):
+    """Asking the output for every distinct micrograph id is a full scan
+    of everything published so far, and it grows with the run."""
+
+    def test_TheOutputIsReadBackOnlyOnce(self):
+        output = _CountingCoordOutput([1, 2, 3])
+        harness = _PublishedIdsHarness(output)
+
+        for _ in range(5):
+            harness._getPublishedPickingMicIds()
+
+        self.assertEqual(
+            output.uniqueValueCalls,
+            1,
+            "Every poll re-read the whole published output; at a million "
+            "coordinates that is the dominant cost of doing nothing.",
+        )
+
+    def test_TheFirstReadIsStillHonoured(self):
+        """Resume starts from what a previous run actually published."""
+        harness = _PublishedIdsHarness(_CountingCoordOutput([7, 9]))
+
+        self.assertEqual(harness._getPublishedPickingMicIds(), {7, 9})
+
+    def test_NewlyPublishedIdsAreRemembered(self):
+        output = _CountingCoordOutput([1])
+        harness = _PublishedIdsHarness(output)
+
+        harness._markOutputIdsPersisted('outputCoordinates', [2, 3], '_micId')
+
+        self.assertEqual(harness._getPublishedPickingMicIds(), {1, 2, 3})
+        self.assertEqual(
+            output.uniqueValueCalls,
+            1,
+            "Recording what this run published must not cost another "
+            "scan of the output.",
+        )
+
+    def test_AnAbsentOutputReadsBackEmpty(self):
+        harness = _PublishedIdsHarness(None)
+
+        self.assertEqual(harness._getPublishedPickingMicIds(), set())

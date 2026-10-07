@@ -8,7 +8,10 @@ import os
 import tempfile
 import unittest
 
+from pyworkflow.protocol.constants import STATUS_ABORTED, STATUS_FAILED
+
 from topaz.protocols.protocol_topaz_picking import TopazProtPicking
+from topaz.protocols.protocol_topaz_training import TopazProtTraining
 
 
 class _Mic:
@@ -222,3 +225,111 @@ TestTopazStreamingRegression.testCoordinateReaderSkipsAlreadyPersistedMicrograph
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class _Status:
+    """Mimics the String attribute pyworkflow keeps the status in."""
+
+    def __init__(self, value):
+        self.value = value
+
+    def get(self):
+        return self.value
+
+
+class _CoordSetStub:
+    """Coordinates that never reach the number needed to train."""
+
+    MAX_POLLS = 50
+
+    def __init__(self):
+        self.polls = 0
+
+    def loadAllProperties(self):
+        self.polls += 1
+        if self.polls > self.MAX_POLLS:
+            raise AssertionError(
+                "The step polled %d times for coordinates that are never "
+                "coming: an aborted run can never end here." % self.polls
+            )
+
+    def aggregate(self, operations, operationLabel, groupByLabels):
+        return []
+
+    def isStreamClosed(self):
+        return False
+
+
+class _TrainingWaitHarness(TopazProtTraining):
+    def __init__(self, status):
+        self.status = _Status(status)
+        self.coordSet = _CoordSetStub()
+        self.sleeps = 0
+
+    def _getInputCoordinates(self):
+        return self.coordSet
+
+    def debug(self, *args):
+        pass
+
+    def info(self, *args):
+        pass
+
+    def _streamingSleepOnWait(self):
+        self.sleeps += 1
+
+
+class TestTopazTrainingStopsWaitingWhenTheRunIsOver(unittest.TestCase):
+    """convertInputStep blocks until enough coordinates have arrived.
+
+    Nothing told it to give up, so a run aborted while it waits keeps
+    polling for coordinates that are never coming.
+    """
+
+    def _wait(self, harness):
+        """Drive just the waiting loop, with a fake coordinate Set."""
+        from unittest.mock import patch
+
+        with patch.object(type(harness), 'inputCoordinates',
+                          create=True,
+                          new=_Pointer(harness.coordSet)):
+            with patch.object(harness, 'micsForTraining',
+                              _Value(5), create=True):
+                TopazProtTraining.convertInputStep(harness, None, 1, 20)
+
+    def test_AnAbortedRunStopsWaiting(self):
+        harness = _TrainingWaitHarness(STATUS_ABORTED)
+
+        with self.assertRaises(Exception):
+            self._wait(harness)
+
+        self.assertEqual(
+            harness.coordSet.polls,
+            0,
+            "An aborted run has nothing left to train on: it must not "
+            "poll for coordinates even once.",
+        )
+
+    def test_AFailedRunStopsWaiting(self):
+        harness = _TrainingWaitHarness(STATUS_FAILED)
+
+        with self.assertRaises(Exception):
+            self._wait(harness)
+
+        self.assertEqual(harness.coordSet.polls, 0)
+
+
+class _Pointer:
+    def __init__(self, value):
+        self._value = value
+
+    def get(self):
+        return self._value
+
+
+class _Value:
+    def __init__(self, value):
+        self._value = value
+
+    def get(self):
+        return self._value

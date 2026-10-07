@@ -17,6 +17,8 @@
 
 import json
 
+import pyworkflow.protocol.constants as cons
+
 
 class _StepArgScan:
     """Incremental scan state for one ``_collectStepArgKeys`` query.
@@ -46,6 +48,50 @@ class TopazStreamingBase:
     items, and a full rescan on every poll would make it slower the longer
     it runs.
     """
+
+    # --------------------------- termination ---------------------------
+
+    def _streamingMustStop(self):
+        """True when a waiting loop has to give up.
+
+        A protocol that has been aborted, or already marked FAILED, is
+        never going to get what it is waiting for. A loop that keeps
+        polling regardless leaves the run with a step that can only end
+        when the producer does - which, for an abort, is never.
+        """
+        status = getattr(self, 'status', None)
+        value = status.get() if hasattr(status, 'get') else status
+
+        return value in (cons.STATUS_FAILED, cons.STATUS_ABORTED)
+
+    # ------------------------- persisted output ------------------------
+
+    def _getKnownPersistedOutputIds(self, outputName, attribute='_micId'):
+        """Ids already published, read back once and then kept current.
+
+        Asking the output Set for every distinct id on every poll is a
+        full scan of everything published so far, which grows with the
+        run. The first call pays for it; after that the protocol knows
+        what it published and says so.
+        """
+        cached = getattr(self, '_persistedOutputIds', None)
+
+        if cached is None:
+            cached = {}
+            self._persistedOutputIds = cached
+
+        if outputName not in cached:
+            ids = self._getOutputUniqueValues(
+                getattr(self, outputName, None), attribute)
+            cached[outputName] = set() if ids is None else set(ids)
+
+        return cached[outputName]
+
+    def _markOutputIdsPersisted(self, outputName, itemIds,
+                                attribute='_micId'):
+        """Record ids this run has just published."""
+        known = self._getKnownPersistedOutputIds(outputName, attribute)
+        known.update(itemIds)
 
     # ------------------------- input discovery -------------------------
     def _discoverIdsAfter(self, inputSet, lastId):

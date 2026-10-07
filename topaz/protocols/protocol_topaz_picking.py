@@ -184,11 +184,13 @@ class TopazProtPicking(TopazStreamingBase, ProtParticlePickingAuto,
     return self._collectStepArgKeys(PICKING_STEP_NAMES, keyType=str)
 
   def _getPublishedPickingMicIds(self):
-    """Micrograph ids already represented in the output coordinates."""
-    micIds = self._getOutputUniqueValues(
-      getattr(self, 'outputCoordinates', None), '_micId')
+    """Micrograph ids already represented in the output coordinates.
 
-    return set() if micIds is None else micIds
+    Read back once and kept current from there: asking the output for
+    every distinct id on each poll is a full scan of everything
+    published so far, and it grows for as long as the run does.
+    """
+    return self._getKnownPersistedOutputIds('outputCoordinates', '_micId')
 
   def _checkNewOutput(self):
     """Publish finished picking without DONE sidecars.
@@ -218,6 +220,8 @@ class TopazProtPicking(TopazStreamingBase, ProtParticlePickingAuto,
 
     if newDone:
       self._updateOutputCoordSet(newDone, streamMode)
+      self._markOutputIdsPersisted(
+        'outputCoordinates', [mic.getObjId() for mic in newDone], '_micId')
     elif not self.finished:
       self._streamingSleepOnWait()
       return
