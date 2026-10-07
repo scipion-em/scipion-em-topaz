@@ -27,6 +27,7 @@
 import os, re
 import time
 
+import pyworkflow.object as pwobj
 import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as cons
@@ -34,7 +35,11 @@ from pwem.protocols import ProtParticlePickingAuto
 
 from topaz import convert, Plugin
 from topaz.protocols.protocol_base import ProtTopazBase
+from topaz.protocols.protocol_streaming_base import TopazStreamingBase
 from topaz.convert import (readSetOfCoordinates)
+
+# Module level: these helpers are called unbound on light test harnesses.
+PICKING_STEP_NAMES = ('pickMicrographStep', 'pickMicrographListStep')
 
 TOPAZ_COORDINATES_FILE = 'topaz_coordinates_file'
 PICKING_DENOISE_FOLDER = 'picking_denoise_folder'
@@ -45,7 +50,8 @@ MODEL_FOLDER = 'model_folder'
 MICRO_BASE_FOLDER = "micrographs%(min)s-%(max)s"
 
 
-class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
+class TopazProtPicking(TopazStreamingBase, ProtParticlePickingAuto,
+                       ProtTopazBase):
   """ Perform a picking using a topaz model """
   _label = 'picking'
 
@@ -125,6 +131,108 @@ class TopazProtPicking(ProtParticlePickingAuto, ProtTopazBase):
     }
 
     self._updateFilenamesDict(myDict)
+
+  # ----------------------- streaming discovery -----------------------------
+  def _loadSet(self, inputSet, SetClass, getKeyFunc):
+    """Discover the micrographs added since the last poll.
+
+    pwem rebuilds the Set from a storage filename and walks it whole on
+    every poll. This asks the Set for the ids above the watermark and
+    loads only those, so a poll costs what just arrived.
+    """
+    knownIds = self._getKnownStreamIds('_lastMicId')
+    newItems, producerClosed, terminalConsistent = (
+      self._discoverNewInputItems(inputSet, '_lastMicId', knownIds))
+
+    newItemDict = {}
+
+    for item in newItems:
+      itemId = item.getObjId()
+
+      if itemId in knownIds:
+        continue
+
+      knownIds.add(itemId)
+      itemKey = getKeyFunc(item)
+
+      if itemKey not in self.micDict:
+        newItemDict[itemKey] = item
+
+    return newItemDict, producerClosed and terminalConsistent
+
+  def _checkNewInput(self):
+    """Discover new micrographs without consulting a filesystem mtime.
+
+    pwem gates this on the modification time of a file behind the input
+    Set, which says nothing about its logical contents.
+    """
+    micDict, self.streamClosed = self._loadInputList()
+
+    if not micDict:
+      return
+
+    outputStep = self._getFirstJoinStep()
+    deps = self._insertNewMicsSteps(micDict.values())
+
+    if outputStep is not None:
+      outputStep.addPrerequisites(*deps)
+
+    self.updateSteps()
+
+  def _getFinishedPickingMicNames(self):
+    """Micrograph names carried by finished picking steps."""
+    return self._collectStepArgKeys(PICKING_STEP_NAMES, keyType=str)
+
+  def _getPublishedPickingMicIds(self):
+    """Micrograph ids already represented in the output coordinates."""
+    micIds = self._getOutputUniqueValues(
+      getattr(self, 'outputCoordinates', None), '_micId')
+
+    return set() if micIds is None else micIds
+
+  def _checkNewOutput(self):
+    """Publish finished picking without DONE sidecars.
+
+    pwem decides this with extra/DONE/mic_*.TXT plus DONE/all.TXT. The
+    persisted step graph already records what finished and the output Set
+    what was published, so neither file is consulted.
+    """
+    if getattr(self, 'finished', False):
+      return
+
+    publishedMicIds = self._getPublishedPickingMicIds()
+    finishedMicNames = self._getFinishedPickingMicNames()
+
+    listOfMics = list(self.micDict.values())
+    newDone = [mic for mic in listOfMics
+               if mic.getMicName() in finishedMicNames
+               and mic.getObjId() not in publishedMicIds]
+
+    doneCount = len([mic for mic in listOfMics
+                     if mic.getObjId() in publishedMicIds])
+    allDone = doneCount + len(newDone)
+
+    self.finished = self.streamClosed and allDone == len(listOfMics)
+    streamMode = (pwobj.Set.STREAM_CLOSED
+                  if self.finished else pwobj.Set.STREAM_OPEN)
+
+    if newDone:
+      self._updateOutputCoordSet(newDone, streamMode)
+    elif not self.finished:
+      self._streamingSleepOnWait()
+      return
+
+    if self.finished:
+      self._updateStreamState(streamMode)
+
+      # The lifecycle here is still the classic one: createOutputStep was
+      # scheduled with wait=True and only runs once something releases
+      # it. Without this it stays WAITING for good and the protocol never
+      # finishes, however complete the output is.
+      outputStep = self._getFirstJoinStep()
+
+      if outputStep and outputStep.isWaiting():
+        outputStep.setStatus(cons.STATUS_NEW)
 
   # --------------------------- STEPS functions ------------------------------
   def _pickMicrograph(self, micrograph, *args):

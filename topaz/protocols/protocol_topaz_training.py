@@ -33,7 +33,6 @@ import pyworkflow.utils as pwutils
 import pyworkflow.protocol.params as params
 import pyworkflow.protocol.constants as cons
 from pwem.protocols import ProtParticlePicking
-from pwem.objects import SetOfMicrographs, SetOfCoordinates
 from pwem.emlib.image import ImageHandler
 
 from topaz.protocols.protocol_base import ProtTopazBase
@@ -205,14 +204,16 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
 
     micIds = []
     coordSet = self.inputCoordinates.get()
-    setFn = coordSet.getFileName()
-    self.debug("Loading input db: %s" % setFn)
+    self.debug("Waiting for enough input coordinates.")
 
-    # Load set of coordinates with a user determined number of coordinates for the training step
+    # Wait until enough micrographs have coordinates to train on. The Set
+    # is refreshed in place with loadAllProperties(); it used to be rebuilt
+    # from its storage filename on every turn, which ties this to how the
+    # Set happens to be persisted.
     enoughMicrographs = False
+
     while True:
-      coordSet = SetOfCoordinates(filename=setFn)
-      coordSet._xmippMd = params.String()
+      micIds = []
       coordSet.loadAllProperties()
 
       for micAgg in coordSet.aggregate(["MAX"], "_micId", ["_micId"]):
@@ -226,8 +227,7 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
         if coordSet.isStreamClosed():
           raise Exception("Input coordinates set is closed and there is not enough data to do the training!!.")
         self.info("Not yet there: %s" % len(micIds))
-        import time
-        time.sleep(10)
+        self._streamingSleepOnWait()
 
     # Create input folder and pre-processed micrographs folder
     micDir = self._getFileName(TRAINING)
@@ -237,10 +237,10 @@ class TopazProtTraining(ProtParticlePicking, ProtTopazBase):
 
     ih = ImageHandler()
 
-    # Get a refreshed set of micrographs
-    micsFn = self.inputCoordinates.get().getMicrographs().getFileName()
-    # not updating, refresh problem
-    coordMics = SetOfMicrographs(filename=micsFn)
+    # Get a refreshed set of micrographs. Reloading its properties is what
+    # picks up what the producer has added; reopening it from a storage
+    # filename was only ever a way of forcing that refresh.
+    coordMics = self.inputCoordinates.get().getMicrographs()
     coordMics.loadAllProperties()
 
     # Create a 0/1 list to mark micrographs for training/testing
