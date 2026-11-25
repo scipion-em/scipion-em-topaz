@@ -1,5 +1,13 @@
-3.2.0
+3.2.0:
     - Help documentation enhances
+    - Streaming hardened:
+        - New items are discovered incrementally and only the new ones are loaded
+        - Continue resumes from where the run stopped and retries the batches left unfinished
+        - Coordinates of batches that overlap the requested range are no longer missed
+        - The protocol stops waiting when it is aborted or failed, or when its input is closed and nothing new can arrive
+        - Already published output is no longer rescanned on every poll
+    - Installation hardened: a CUDA-enabled PyTorch is pinned (no CPU build from the user's Conda channels) and
+      the package is only marked as installed once Topaz and PyTorch actually run
 
 3.1.2:
     - Checks added to address:
