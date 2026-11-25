@@ -137,12 +137,11 @@ def readSetOfCoordinates(coordinatesCsvFn, micSet, coordSet, scale):
     for row in csv:
         micId = int(row[0])
         if micId != lastMicId:
-            mic = micDict[micId]
+            mic = micDict.get(micId)
             if mic is None:
-                print("Missing id: ", micId)
-            else:
-                coord.setMicrograph(mic)
-                lastMicId = micId
+                continue
+            coord.setMicrograph(mic)
+            lastMicId = micId
 
         coord.setPosition(int(round(float(row[1])*scale)), int(round(float(row[2])*scale)))
         coord._topazScore.set(float(row[3]))
